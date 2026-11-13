@@ -1,0 +1,42 @@
+name: Build Android
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 21 }
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - run: npx cap sync android
+      - name: Debug APK (install directly on a phone to try it)
+        working-directory: android
+        run: ./gradlew assembleDebug --no-daemon
+      - uses: actions/upload-artifact@v4
+        with: { name: dosewell-debug-apk, path: android/app/build/outputs/apk/debug/*.apk }
+      - name: Signed release bundle for Play (runs only when the keystore secrets exist)
+        if: ${{ env.KEYSTORE_B64 != '' }}
+        working-directory: android
+        env:
+          KEYSTORE_B64: ${{ secrets.DOSEWELL_KEYSTORE_BASE64 }}
+          DOSEWELL_KEYSTORE_PASSWORD: ${{ secrets.DOSEWELL_KEYSTORE_PASSWORD }}
+          DOSEWELL_KEY_ALIAS: ${{ secrets.DOSEWELL_KEY_ALIAS }}
+          DOSEWELL_KEY_PASSWORD: ${{ secrets.DOSEWELL_KEY_PASSWORD }}
+        run: |
+          echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/dosewell.jks"
+          DOSEWELL_KEYSTORE_FILE="$RUNNER_TEMP/dosewell.jks" ./gradlew bundleRelease --no-daemon
+      - uses: actions/upload-artifact@v4
+        if: ${{ hashFiles('android/app/build/outputs/bundle/release/*.aab') != '' }}
+        with: { name: dosewell-release-aab, path: android/app/build/outputs/bundle/release/*.aab }
+    env:
+      KEYSTORE_B64: ${{ secrets.DOSEWELL_KEYSTORE_BASE64 }}

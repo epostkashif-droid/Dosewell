@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Dosewell</string>
+    <string name="title_activity_main">Dosewell</string>
+    <string name="package_name">in.kaybuilds.dosewell</string>
+    <string name="custom_url_scheme">in.kaybuilds.dosewell</string>
+</resources>

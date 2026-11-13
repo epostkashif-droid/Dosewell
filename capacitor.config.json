@@ -1,0 +1,9 @@
+{
+  "appId": "in.kaybuilds.dosewell",
+  "appName": "Dosewell",
+  "webDir": "www",
+  "android": { "allowMixedContent": false, "captureInput": false, "webContentsDebuggingEnabled": false },
+  "plugins": {
+    "LocalNotifications": { "smallIcon": "ic_stat_dose", "iconColor": "#7466D8" }
+  }
+}
