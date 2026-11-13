@@ -10,7 +10,7 @@ Made by Kashif Nowman Kanak, Chennai, India.
 - Photos of prescriptions, lab reports and bills
 - Streaks, milestones and a shareable streak picture
 - Refill warnings, a 30-day report for the doctor, backup and restore
-- Everything stays on the phone: no account, no server, no ads, no analytics
+- Everything stays on the phone: no account, no server, no ads, no analytics, and no internet permission
 
 ## Project layout
 
@@ -18,9 +18,9 @@ Made by Kashif Nowman Kanak, Chennai, India.
 | --- | --- |
 | `src/logic.js` | Scheduling, streaks, missed-dose rules and data validation. No UI code. |
 | `src/app.js`, `src/styles.css` | The interface |
-| `src/platform.js` | Android features: notifications, storage, sharing |
+| `src/platform.js` | Bridge between the interface and the phone |
 | `src/config.js` | Maker name, support email, privacy policy link |
-| `android/` | The Android project (Capacitor 8, target API 36) |
+| `android/` | The Android shell: a small Java app (no third-party libraries, target API 36) that shows the interface and runs alarms, notifications, camera and sharing |
 | `tests/` | Unit, fuzz, contrast and browser tests |
 | `docs/` | Play Store pack, privacy policy, test report |
 
@@ -31,8 +31,10 @@ npm ci
 npm test                 # logic, fuzz and contrast tests
 npm run build            # writes www/ and dist/dosewell.html
 python3 tests/e2e.py     # browser tests (needs Python Playwright and Chrome)
-npm run android:debug    # needs JDK 21 and the Android SDK
+bash scripts/fetch-android-tools.sh   # once: downloads the Android build tools (about 180 MB)
+bash scripts/build-android.sh         # writes dist/Dosewell-1.0.0.apk and .aab (needs JDK 21, zip, unzip)
 ```
 
-Every push to `main` also builds a debug APK in GitHub Actions (Actions tab, latest run, Artifacts).
+Every push to `main` also builds the APK and app bundle in GitHub Actions (Actions tab, latest run, Artifacts).
+Without your own keystore the build is signed with a throwaway test key, which is fine for trying the app but not for Play.
 See `docs/PLAY_STORE.md` for signing and the store submission steps.

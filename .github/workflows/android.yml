@@ -17,26 +17,19 @@ jobs:
         with: { distribution: temurin, java-version: 21 }
       - run: npm ci
       - run: npm test
-      - run: npm run build
-      - run: npx cap sync android
-      - name: Debug APK (install directly on a phone to try it)
-        working-directory: android
-        run: ./gradlew assembleDebug --no-daemon
-      - uses: actions/upload-artifact@v4
-        with: { name: dosewell-debug-apk, path: android/app/build/outputs/apk/debug/*.apk }
-      - name: Signed release bundle for Play (runs only when the keystore secrets exist)
-        if: ${{ env.KEYSTORE_B64 != '' }}
-        working-directory: android
+      - run: bash scripts/fetch-android-tools.sh
+      - name: Restore the release keystore (only when the secrets exist; otherwise a throwaway test key is used)
         env:
           KEYSTORE_B64: ${{ secrets.DOSEWELL_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KEYSTORE_B64" ]; then echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/dosewell.jks"; echo "DOSEWELL_KEYSTORE_FILE=$RUNNER_TEMP/dosewell.jks" >> "$GITHUB_ENV"; fi
+      - name: Build APK and app bundle
+        env:
           DOSEWELL_KEYSTORE_PASSWORD: ${{ secrets.DOSEWELL_KEYSTORE_PASSWORD }}
           DOSEWELL_KEY_ALIAS: ${{ secrets.DOSEWELL_KEY_ALIAS }}
           DOSEWELL_KEY_PASSWORD: ${{ secrets.DOSEWELL_KEY_PASSWORD }}
         run: |
-          echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/dosewell.jks"
-          DOSEWELL_KEYSTORE_FILE="$RUNNER_TEMP/dosewell.jks" ./gradlew bundleRelease --no-daemon
+          [ -n "$DOSEWELL_KEYSTORE_PASSWORD" ] || unset DOSEWELL_KEYSTORE_PASSWORD DOSEWELL_KEY_ALIAS DOSEWELL_KEY_PASSWORD
+          bash scripts/build-android.sh
       - uses: actions/upload-artifact@v4
-        if: ${{ hashFiles('android/app/build/outputs/bundle/release/*.aab') != '' }}
-        with: { name: dosewell-release-aab, path: android/app/build/outputs/bundle/release/*.aab }
-    env:
-      KEYSTORE_B64: ${{ secrets.DOSEWELL_KEYSTORE_BASE64 }}
+        with: { name: dosewell-android, path: "dist/Dosewell-*" }

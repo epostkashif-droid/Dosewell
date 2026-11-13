@@ -201,12 +201,66 @@ async def monkey(b):
     st = await pg.evaluate("() => JSON.stringify(window.__dosewell.get())"); check("saved data is still valid after random tapping", len(st) < 300000 and json.loads(st)["v"] == 1)
     await ctx.close()
 
+STUB = """
+window.__calls = []; window.__store = {state: '', recs: {}, pending: '[]', allowed: false};
+const rec = (n, a) => window.__calls.push([n].concat(Array.from(a)));
+window.DosewellNative = {
+  status(){ return JSON.stringify({supported:true, allowed: window.__store.allowed, asked:false, exact:true}) },
+  askNotif(){ rec('askNotif', arguments); window.__store.allowed = true; setTimeout(() => window.__dwResume && window.__dwResume(), 50) },
+  askExact(){ rec('askExact', arguments) }, schedule(j){ rec('schedule', arguments) }, cancelAll(){ rec('cancelAll', arguments) },
+  takePending(){ const p = window.__store.pending; window.__store.pending = '[]'; return p }, setSnooze(m){ rec('setSnooze', arguments) }, clearDelivered(i){ rec('clearDelivered', arguments) },
+  saveState(j){ window.__store.state = j; try { sessionStorage.setItem('nstate', j) } catch (e) {} }, loadState(){ try { return sessionStorage.getItem('nstate') || '' } catch (e) { return '' } },
+  recordIds(){ return JSON.stringify(Object.keys(window.__store.recs)) }, readRecord(i){ return window.__store.recs[i] || '' }, writeRecord(i, j){ window.__store.recs[i] = j; return true }, deleteRecord(i){ delete window.__store.recs[i] },
+  copy(t){ rec('copy', arguments) }, shareText(t){ rec('shareText', arguments) }, shareImage(b, t){ rec('shareImage', [b.length, t]) }, shareFile(n, t){ rec('shareFile', [n, t.length]) }, bars(d){ rec('bars', arguments) }
+};
+"""
+async def android_shell(b):
+    """The page exactly as the Android app loads it: from file://, with the phone bridge present."""
+    ctx = await b.new_context(viewport={"width": 390, "height": 844}); pg = await ctx.new_page()
+    await pg.add_init_script("window.__DOSEWELL_TEST__ = true;" + STUB)
+    pg.on("pageerror", lambda e: errors.append("shell: " + str(e))); csp = []
+    pg.on("console", lambda m: csp.append(m.text) if m.type == "error" else None)
+    await pg.goto("file://" + os.path.join(ROOT, "www", "index.html")); await pg.wait_for_timeout(500)
+    check("app starts from local files under its security policy", await pg.is_visible("text=Never miss a dose"), csp[:2])
+    font = await pg.evaluate("async () => { await document.fonts.ready; return document.fonts.check('16px Jakarta') }")
+    check("bundled font loads without any network or file fetch", font)
+    await pg.click('[data-a="onb-next"]'); await pg.check("#onb-ok"); await pg.click('[data-a="onb-accept"]')
+    await pg.fill("#p-name", "Amma"); await pg.click('form[data-form="person"] .btn.primary'); await pg.wait_for_timeout(200)
+    check("first run asks for notification permission with an explanation", await pg.is_visible("text=Turn on reminders"))
+    await pg.click('#panel [data-a="ask-notif"]'); await pg.wait_for_timeout(300)
+    await pg.click("#fab"); await pg.fill("#m-name", "Metformin"); await pg.fill('#times input[type=time]', "23:59"); await pg.click('form[data-form="med"] .btn.primary'); await pg.wait_for_timeout(1600)
+    calls = await pg.evaluate("() => window.__calls"); sched = [c for c in calls if c[0] == "schedule"]
+    plan = json.loads(sched[-1][1]) if sched else []
+    doses = [x for x in plan if x.get("k")]
+    check("saving a medicine schedules phone reminders 30 days ahead", 28 <= len(doses) <= 31, len(doses))
+    ok = all(isinstance(x["id"], int) and 0 < x["id"] < 1000000000 and x["at"] > time.time() * 1000 and x["title"] and x["fu"] == 45 for x in doses) and len(set(x["id"] for x in plan)) == len(plan)
+    check("every reminder has a unique id, a future time, a title and a 45-minute follow-up", ok)
+    check("the plan ends with a nudge to reopen the app", plan and plan[-1].get("plain") is True and plan[-1]["at"] > doses[-1]["at"])
+    check("times are in ascending order", all(plan[i]["at"] <= plan[i + 1]["at"] for i in range(len(plan) - 1)))
+    # a dose marked Taken on the notification while the app was closed
+    d = doses[0]
+    await pg.evaluate("p => { window.__store.pending = JSON.stringify([p, {d:'<x>',k:'m|1',t:'9999'}, null, {d:p.d,k:'ghost|08:00',t:'0800'}]); window.__dwResume() }", {"d": d["d"], "k": d["k"], "t": "2359"})
+    await pg.wait_for_timeout(300); st = await pg.evaluate("() => window.__dosewell.get()")
+    check("Taken pressed on a notification is recorded when the app opens; forged entries are ignored", st["logs"].get(d["d"], {}) == {d["k"]: "t2359"}, st["logs"])
+    check("state is mirrored to the phone's own storage", "Metformin" in await pg.evaluate("() => window.__store.state"))
+    await pg.evaluate("() => { document.querySelector('#m-name') || 0; }")
+    back = await pg.evaluate("() => { location.hash = '#more'; return new Promise(r => setTimeout(() => { const a = window.__dwBack(); setTimeout(() => r([a, location.hash, window.__dwBack()]), 100) }, 100)) }")
+    check("back button returns to Today, then leaves the app", back[0] is True and back[1] == "#today" and back[2] is False, back)
+    await pg.evaluate("() => { location.hash = '#progress' }"); await pg.wait_for_timeout(200); await pg.click('[data-a="share"]'); await pg.wait_for_timeout(400); await pg.click('[data-a="share-native"]'); await pg.click('[data-a="copy-share"]')
+    await pg.keyboard.press("Escape"); await pg.evaluate("() => { location.hash = '#more' }"); await pg.wait_for_timeout(200); await pg.click('[data-a="export"]'); await pg.wait_for_timeout(100)
+    names = [c[0] for c in await pg.evaluate("() => window.__calls")]
+    check("share picture, copy and backup go through the phone bridge", all(n in names for n in ("shareImage", "copy", "shareFile", "bars", "setSnooze")), names[-8:])
+    await pg.reload(); await pg.wait_for_timeout(400); await pg.evaluate("() => { location.hash = '#meds' }"); await pg.wait_for_timeout(200)
+    check("app restores from the phone's storage after a restart", await pg.is_visible("text=Metformin"))
+    check("no security-policy violations while running as the Android app", not [c for c in csp if "Content Security Policy" in c], csp[:2])
+    await ctx.close()
+
 async def main():
     srv = subprocess.Popen([sys.executable, "-m", "http.server", "8766", "--directory", os.path.join(ROOT, "www")], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL); time.sleep(1)
     try:
         async with async_playwright() as p:
             b = await p.chromium.launch(executable_path=CHROME, args=["--no-sandbox"])
-            for part in (flow, guardian, injection, layout, resilience, monkey):
+            for part in (flow, guardian, injection, layout, resilience, android_shell, monkey):
                 try: await part(b)
                 except Exception as e: check(part.__name__ + " ran to the end", False, repr(e)[:300])
             await b.close()

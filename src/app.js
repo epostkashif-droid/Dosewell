@@ -3,7 +3,7 @@ import {
   pad, ymd, fromYmd, addDays, today, fmtTime, at, DOW, niceDate, FORMS, FOODS, RELATIONS, BLOODS, REC_TYPES, LIMITS,
   isDate, isId, isTime, str, blank, sanitizeState, sanitizeRecord, makeLogic, sampleState, waNumber, telHref
 } from './logic.js';
-import { native, bridgeMissing, store, reminders, sharing, onAppEvents } from './platform.js';
+import { native, store, reminders, sharing, clip, setBars, onAppEvents, HORIZON_DAYS } from './platform.js';
 
 /* ============ state ============ */
 let state = blank(), records = [];
@@ -28,8 +28,13 @@ function save() {
   clearTimeout(syncTimer);
   syncTimer = setTimeout(syncReminders, 1200);
 }
-function syncReminders() { reminders.sync(L.upcoming(5), state.people, state.settings); }
-function applyTheme() { const t = state.settings.theme; if (t === 'system') delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = t; }
+function syncReminders() { reminders.sync(L.upcoming(HORIZON_DAYS), state.people, state.settings); }
+let barsDark = null;
+function applyTheme() {
+  const t = state.settings.theme; if (t === 'system') delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = t;
+  let dark = t === 'dark'; try { if (t === 'system') dark = window.matchMedia('(prefers-color-scheme: dark)').matches; } catch (e) { /* ignore */ }
+  if (dark !== barsDark) { barsDark = dark; setBars(dark); }
+}
 
 /* ============ icons ============ */
 const ICON = {
@@ -61,6 +66,7 @@ const ART = `<svg class="art" viewBox="0 0 200 200" aria-hidden="true"><rect x="
 
 function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('show'), 2800); }
 async function copyText(text, okMsg) {
+  if (clip(text)) { toast(okMsg || 'Copied'); return; }
   try { await navigator.clipboard.writeText(text); toast(okMsg || 'Copied'); }
   catch (e) { openSheet(`<h2>Copy this text</h2><p class="muted small">Press and hold to select it, then copy.</p><textarea class="copybox" id="copybox" readonly>${esc(text)}</textarea><button class="btn wide" data-a="close">Done</button>`); const b = $('#copybox'); if (b) b.select(); }
 }
@@ -79,7 +85,6 @@ function chips() {
 function sampleBanner() { return state.sample ? `<div class="banner"><h3>You are exploring sample data</h3><p class="small">Amma, Zoya and their medicines are examples.</p><div class="btnrow"><button class="btn sm" data-a="start-fresh">Clear and add my own</button></div></div>` : ''; }
 function systemBanners() {
   let h = '';
-  if (bridgeMissing) h += `<div class="banner warn"><h3>Reminders cannot run on this phone yet</h3><p class="small">Update "Android System WebView" from the Play Store, then reopen Dosewell.</p></div>`;
   if (remStatus.supported && !remStatus.allowed && state.meds.length) h += `<div class="banner warn"><h3>Reminders are off</h3><p class="small">Dosewell needs permission to show a notification when a dose is due.</p><div class="btnrow"><button class="btn sm" data-a="ask-notif">Turn on reminders</button></div></div>`;
   return h;
 }
@@ -183,7 +188,7 @@ function viewMore() {
     ${state.contacts.length ? `<ul class="list">${state.contacts.map(c => `<li><button class="rowbtn" data-a="edit-contact" data-id="${esc(c.id)}"><span class="grow"><strong>${esc(c.name)}</strong> <span class="muted small">${esc(c.relation)}</span>${c.guardian ? ' <span class="pill ok">Guardian</span>' : ''}<span class="small muted" style="display:block">${esc(c.phone)}</span></span></button>${telLink(c.phone, 'Call')}</li>`).join('')}</ul>` : '<p class="muted small" style="margin-top:10px">Add who to call first. Mark one as guardian to tell them about missed doses.</p>'}</section>
   <h2 class="section-h">Reminders</h2>
   <section class="card"><ul class="list">
-    ${remStatus.supported ? `<li><div class="grow"><strong>Phone notifications</strong><div class="small muted">${remStatus.allowed ? 'On. Reminders arrive even when Dosewell is closed.' : 'Off. Turn on to get reminders.'}</div></div>${remStatus.allowed ? '<span class="pill ok">On</span>' : '<button class="btn sm" data-a="ask-notif">Turn on</button>'}</li>
+    ${remStatus.supported ? `<li><div class="grow"><strong>Phone notifications</strong><div class="small muted">${remStatus.allowed ? 'On. Reminders arrive even when Dosewell is closed, planned ' + HORIZON_DAYS + ' days ahead.' : 'Off. Turn on to get reminders.'}</div></div>${remStatus.allowed ? '<span class="pill ok">On</span>' : '<button class="btn sm" data-a="ask-notif">Turn on</button>'}</li>
     ${remStatus.allowed ? `<li><div class="grow"><strong>On-the-minute alarms</strong><div class="small muted">${remStatus.exact ? 'Allowed.' : 'Not allowed, so Android may delay a reminder by a few minutes.'}</div></div>${remStatus.exact ? '<span class="pill ok">On</span>' : '<button class="btn sm" data-a="ask-exact">Allow</button>'}</li>` : ''}` : ''}
     ${sw('sound', st.sound, 'Alarm sound in the app', 'Chime when a dose is due and Dosewell is open')}
     ${sw('followUp', st.followUp, 'Remind again after 45 minutes', 'If the dose is still not marked')}
@@ -211,7 +216,7 @@ const PRIVACY = `<p><strong>Short version: your information stays with you.</str
 <h3>What Dosewell stores</h3><p>Names and details of the people you add, their medicines and schedules, the doses you mark, emergency contacts, and the photos of records you save.</p>
 <h3>Where it is stored</h3><p>${native ? 'Only on this phone, inside the app\'s private storage. Dosewell has no account and no server. The maker cannot see your information.' : 'In this browser, and in your private space if you are signed in. The maker cannot see your information.'}</p>
 <h3>What is shared</h3><p>Nothing, unless you choose to. When you tap Share, Tell a guardian, or Back up, Dosewell hands the text or file to the app you pick (for example WhatsApp or Messages). Dosewell has no ads, no analytics and no trackers.</p>
-<h3>Permissions</h3><p>Notifications and alarms, to remind you at the times you set. The camera opens only when you tap Take a photo.</p>
+<h3>Permissions</h3><p>Notifications and alarms, to remind you at the times you set. The camera opens only when you tap Take a photo. ${native ? 'Dosewell has no internet permission, so it cannot send anything anywhere.' : ''}</p>
 <h3>Deleting your data</h3><p>More, then Erase everything removes all of it at once. Uninstalling the app also removes it.</p>
 <h3>Children</h3><p>Dosewell is meant for adults, including adults managing a child's medicines.</p>
 <h3>Contact</h3><p>${esc(APP.maker)}, ${esc(APP.place)}${APP.email ? '. ' + esc(APP.email) : ''}.</p>`;
@@ -466,7 +471,7 @@ const A = {
   'copy-guardian': () => copyText($('#g-msg').value, 'Message copied'),
   share: d => shareSheet(d.id),
   'copy-share': () => copyText(shareMsg, 'Message copied'),
-  'share-native': async () => { try { await sharing.image(shareCanvas.toDataURL('image/png'), shareMsg); } catch (e) { /* cancelled */ } },
+  'share-native': () => { try { sharing.image(shareCanvas.toDataURL('image/png'), shareMsg); } catch (e) { toast('Could not open the share menu.'); } },
   'save-card': async () => { if (!store.downloads || !shareCanvas) return; try { const blob = await new Promise(r => shareCanvas.toBlob(r, 'image/png')); await store.downloads.save({ filename: 'dosewell-streak.png', data: blob }); toast('Picture saved'); } catch (e) { if (!e || e.code !== 'declined') toast('Could not save here. Press and hold the picture instead.'); } },
   report: d => { if (person(d.id)) copyText(reportText(d.id), 'Report copied'); },
   'add-rec': recSheet,
@@ -476,8 +481,8 @@ const A = {
   'del-rec': async d => { try { await store.deleteRecord(d.id); records = records.filter(r => r.id !== d.id); } catch (e) { toast('Could not delete. Try again.'); } closeSheet(); render(); },
   privacy: () => openSheet(`<h2>Privacy policy</h2><div class="prose">${PRIVACY}</div><button class="btn wide" data-a="close">Close</button>`),
   disclaimer: () => openSheet(`<h2>Medical disclaimer</h2><div class="prose">${DISCLAIMER}</div><button class="btn wide" data-a="close">Close</button>`),
-  'ask-notif': async () => { closeSheet(); const ok = await reminders.ask(); remStatus = await reminders.status(); if (ok) { syncReminders(); toast('Reminders are on'); } else toast('Notifications are blocked. Allow them in phone Settings, Apps, Dosewell.'); render(); },
-  'ask-exact': async () => { await reminders.askExact(); remStatus = await reminders.status(); syncReminders(); render(); },
+  'ask-notif': () => { closeSheet(); reminders.ask(); },
+  'ask-exact': () => reminders.askExact(),
   'test-alarm': () => { unlockAudio(); const n = new Date(); testAlarm = true; showAlarm([{ med: { id: 'test', personId: '', name: 'Sample medicine', strength: '500 mg', form: 'Tablet', qty: 1, food: 'After food' }, time: pad(n.getHours()) + ':' + pad(n.getMinutes()), key: 'test', date: today() }]); },
   'alarm-take': d => { if (testAlarm) { hideAlarm(); return; } takeDose(d.d, d.k); alarmKeys = ''; tick(); render(); },
   'alarm-snooze': () => { const until = Date.now() + state.settings.snooze * 60000; for (const d of dueList()) silenced[d.date + '|' + d.key] = until; hideAlarm(); toast('Snoozed for ' + state.settings.snooze + ' minutes'); },
@@ -485,7 +490,7 @@ const A = {
   export: async () => { try { await sharing.file('dosewell-backup-' + today() + '.json', JSON.stringify({ app: 'dosewell', format: 1, exportedAt: new Date().toISOString(), state, records })); } catch (e) { if (!e || e.code !== 'declined') toast('Could not create the backup file here.'); } },
   'do-import': async () => { const imp = pendingImport; pendingImport = null; if (!imp) return; const old = records.map(r => r.id); state = imp.state; state.settings.onboarded = true; delete state.sample; who = null; save(); await store.clearRecords(old); records = []; for (const r of imp.records) { try { await store.saveRecord(r); records.push(r); } catch (e) { /* skip */ } } closeSheet(); render(); toast('Backup restored'); },
   'ask-reset': () => confirmSheet('Erase everything?', 'All people, medicines, history, contacts and records will be removed for good.', 'reset', '', 'Erase everything'),
-  reset: async () => { const old = records.map(r => r.id); state = blank(); records = []; who = null; onbStep = 0; save(); await store.clearRecords(old); await reminders.cancelAll(); closeSheet(); location.hash = ''; render(); window.scrollTo(0, 0); }
+  reset: async () => { const old = records.map(r => r.id); state = blank(); records = []; who = null; onbStep = 0; save(); await store.clearRecords(old); reminders.cancelAll(); closeSheet(); location.hash = ''; render(); window.scrollTo(0, 0); }
 };
 let pendingImport = null;
 async function readImport(file) {
@@ -562,11 +567,12 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape' && sheetOpen(
 window.addEventListener('hashchange', () => { closeSheet(); render(); window.scrollTo(0, 0); });
 document.addEventListener('visibilitychange', () => { if (!document.hidden) tick(); });
 
-function onNotifAction(actionId, extra) {
-  const ok = extra && isDate(extra.d) && typeof extra.k === 'string';
-  if (ok && actionId === 'taken') { takeDose(extra.d, extra.k); render(); }
-  else if (ok && actionId === 'snooze') { const m = med(extra.k.split('|')[0]); reminders.snooze({ d: extra.d, k: extra.k }, state.settings.discreet || !m ? 'Time for a medicine' : 'Time for ' + m.name, state.settings.snooze); }
-  else { location.hash = '#today'; viewDate = today(); render(); }
+// Doses marked "Taken" on a notification while the app was closed are applied here.
+function applyPending() {
+  let n = 0;
+  for (const p of reminders.pending()) if (p && isDate(p.d) && typeof p.k === 'string' && /^([01]\d|2[0-3])[0-5]\d$/.test(p.t) && !(state.logs[p.d] || {})[p.k] && L.markDose(p.d, p.k, 't' + p.t)) n++;
+  if (n) save();
+  return n;
 }
 
 /* ============ boot ============ */
@@ -578,12 +584,12 @@ async function boot() {
   const remote = await store.loadState();
   if (remote) { const r = sanitizeState(remote); if (r.people.length) r.settings.onboarded = true; if (!state.people.length || r.updatedAt >= state.updatedAt) state = r; }
   try { records = await store.loadRecords(new Set(state.people.map(p => p.id))); } catch (e) { records = []; }
-  await reminders.init(onNotifAction);
-  remStatus = await reminders.status();
+  remStatus = reminders.status();
+  applyPending();
   render(); tick(); setInterval(tick, 15000); syncReminders();
   onAppEvents({
     back: () => { if ($('#alarm').classList.contains('open')) { A['alarm-close'](); return true; } if (sheetOpen()) { closeSheet(); return true; } if (state.settings.onboarded && tab !== 'today') { location.hash = '#today'; return true; } return false; },
-    resume: async () => { remStatus = await reminders.status(); tick(); if (!sheetOpen()) render(); }
+    resume: () => { const was = remStatus.allowed, exact = remStatus.exact; remStatus = reminders.status(); applyPending(); if ((!was && remStatus.allowed) || exact !== remStatus.exact) { syncReminders(); if (!was && remStatus.allowed) toast('Reminders are on'); } tick(); if (!sheetOpen()) render(); }
   });
 }
 boot();

@@ -5,23 +5,11 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "test": "node --test tests/*.test.mjs",
-    "sync": "npm run build && npx cap sync android",
-    "android:debug": "npm run sync && cd android && ./gradlew assembleDebug",
-    "android:release": "npm run sync && cd android && ./gradlew bundleRelease"
+    "android": "bash scripts/build-android.sh"
   },
   "author": "Kashif Nowman Kanak",
   "license": "UNLICENSED",
-  "dependencies": {
-    "@capacitor/android": "^8.6.2",
-    "@capacitor/app": "^8.1.2",
-    "@capacitor/core": "^8.6.2",
-    "@capacitor/filesystem": "^8.1.5",
-    "@capacitor/local-notifications": "^8.3.1",
-    "@capacitor/preferences": "^8.0.1",
-    "@capacitor/share": "^8.0.3"
-  },
   "devDependencies": {
-    "@capacitor/cli": "^8.6.2",
     "@fontsource-variable/plus-jakarta-sans": "^5.3.0",
     "esbuild": "^0.28.2"
   },

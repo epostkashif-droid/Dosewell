@@ -9,12 +9,12 @@ Dosewell 1.0.0, 14 November 2026. Tested as built from this repository.
 | Logic unit tests (`tests/logic.test.mjs`) | 18 of 18 passed |
 | Fuzz: 400 randomly generated, partly corrupt data sets | Passed, no exceptions, all invariants held |
 | Colour contrast, light and dark (`tests/contrast.test.mjs`) | 12 text/background pairs per theme, all at least 4.5:1 |
-| Browser tests in headless Chrome (`tests/e2e.py`) | 68 of 68 passed |
+| Browser tests in headless Chrome (`tests/e2e.py`) | 81 of 81 passed |
 | Dependency audit (`npm audit`) | 0 known vulnerabilities |
 
 ## What was NOT tested
 
-- **The Android build has never been compiled or run.** The build machine could not reach Google's Android SDK, so there is no APK yet. Notifications, exact alarms, restart behaviour, the camera, the share sheet, the back button and SMS/WhatsApp hand-off are written against the Capacitor 8 documentation but unverified on a device. Treat the first GitHub Actions build as the first real test.
+- **The APK has not been run on a phone or emulator.** It compiles against the Android 16 platform, packages, aligns, signs (v2 and v3) and the app bundle passes `bundletool validate`. The interface was tested in Chrome loaded from local files with a stand-in for the phone bridge, which is how the app loads it. But alarms firing, notification buttons, restart behaviour, the camera, the share sheet, the back gesture and screen insets are verified only by compiling, not by running. Install it and try each of these before trusting it with real medicines.
 - No testing on real phones, old Android versions, TalkBack, large font settings or tablets.
 - This is a self-review with automated attack tests. It is not an independent penetration test.
 
@@ -22,7 +22,7 @@ Dosewell 1.0.0, 14 November 2026. Tested as built from this repository.
 
 | # | Defect | Fix |
 | --- | --- | --- |
-| 1 | Alarms rang only while the page was open | Android notifications scheduled five days ahead, restored after restart |
+| 1 | Alarms rang only while the page was open | Android alarms planned 30 days ahead, restored after a restart, with Taken and Snooze handled without opening the app |
 | 2 | Changing a medicine's times rewrote its past: old days suddenly showed as missed | A schedule change only applies from that moment on |
 | 3 | Pausing a medicine hid its history; resuming created a backlog of misses | Logged doses are kept; nothing is counted while paused |
 | 4 | A medicine added in the afternoon showed that morning's dose as missed | Doses before the medicine was added are not counted |
@@ -41,8 +41,8 @@ Dosewell 1.0.0, 14 November 2026. Tested as built from this repository.
 
 - All text a person types is escaped before display, and stripped of control characters and capped in length before storage.
 - Content Security Policy: scripts only from the app itself, no inline script, no outbound network connections, no plugins, no form posts.
-- No account, no server, no analytics, no third-party SDKs beyond Capacitor and its official plugins.
-- Android: backup off, cleartext traffic off, WebView debugging off in release, one exported activity, no deep links, no dangerous permissions.
+- No account, no server, no analytics, and no third-party code at all in the Android app.
+- Android: no internet permission and network loads blocked in the web view, backup off, web view debugging off, file access off, one exported activity, no deep links. The share provider serves single files from one private cache folder and rejects any other path.
 - Signing key and passwords are read from environment variables and never stored in the repository.
 
 ## Known limitations
@@ -50,9 +50,8 @@ Dosewell 1.0.0, 14 November 2026. Tested as built from this repository.
 - The backup file is plain JSON, not encrypted.
 - No app lock (PIN or fingerprint). Anyone who can unlock the phone can open the app.
 - The guardian alert needs the user to press send. Fully automatic alerts would need a server and an SMS or push service.
-- If Android's battery saver restricts the app, a reminder can arrive late. Allowing on-the-minute alarms in More > Reminders reduces this.
-- On a phone with a very old Android System WebView the app shows a banner asking for an update, because reminders cannot be scheduled.
-- `INTERNET` is still declared because the framework template includes it. Removing it is a possible hardening step once tested on a device.
+- Reminders are planned 30 days ahead. If the app is not opened for 30 days, a notification asks the user to open it.
+- Until the user allows on-the-minute alarms (More > Reminders), Android may deliver a reminder a few minutes late, more if battery saver restricts the app.
 
 ## Browser test checks that passed
 
@@ -120,7 +119,20 @@ Dosewell 1.0.0, 14 November 2026. Tested as built from this repository.
 - corrupted saved data cannot crash start-up: []
 - corrupted saved data cannot crash start-up: {"v":1,"people":[{"id":"
 - corrupted saved data cannot crash start-up: "AAAAAAAAAAAAAAAAAAAAAAA
-- 679 random taps and junk entries cause no script errors
+- app starts from local files under its security policy
+- bundled font loads without any network or file fetch
+- first run asks for notification permission with an explanation
+- saving a medicine schedules phone reminders 30 days ahead
+- every reminder has a unique id, a future time, a title and a 45-minute follow-up
+- the plan ends with a nudge to reopen the app
+- times are in ascending order
+- Taken pressed on a notification is recorded when the app opens; forged entries are ignored
+- state is mirrored to the phone's own storage
+- back button returns to Today, then leaves the app
+- share picture, copy and backup go through the phone bridge
+- app restores from the phone's storage after a restart
+- no security-policy violations while running as the Android app
+- 689 random taps and junk entries cause no script errors
 - random tapping leaves no injected markup
 - saved data is still valid after random tapping
 - no uncaught script errors in any test

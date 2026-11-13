@@ -24,9 +24,9 @@ Dosewell shares nothing by itself. When you tap Share, Tell a guardian, or Back 
 
 ## Permissions
 
-- Notifications, alarms and run-at-startup: to show reminders at the times you set, including after the phone restarts
+- Notifications, alarms, vibration and run-at-startup: to show reminders at the times you set, including after the phone restarts
 - Camera: opened only when you tap Take a photo. Dosewell does not request the camera permission itself; your phone's camera app takes the picture
-- Internet: declared by the app framework. Dosewell makes no network requests and is built to block them
+- Dosewell does not request the internet permission, so it cannot send or receive anything over the network
 
 ## Keeping and deleting
 

@@ -11,8 +11,8 @@ Rules checked on 14 November 2026. Google changes these; re-check in Play Consol
    keytool -genkeypair -v -keystore dosewell.jks -keyalg RSA -keysize 2048 -validity 10000 -alias dosewell
    base64 -w0 dosewell.jks   # paste as the GitHub secret DOSEWELL_KEYSTORE_BASE64
    ```
-   Add GitHub secrets `DOSEWELL_KEYSTORE_BASE64`, `DOSEWELL_KEYSTORE_PASSWORD`, `DOSEWELL_KEY_ALIAS`, `DOSEWELL_KEY_PASSWORD`. The next push then also produces a signed `.aab` under Actions > Artifacts. Enrol in Play App Signing when you upload it.
-4. **Test on a real phone** – install the debug APK from GitHub Actions. This project has never been compiled or run on Android; see `TEST_REPORT.md`.
+   Add GitHub secrets `DOSEWELL_KEYSTORE_BASE64`, `DOSEWELL_KEYSTORE_PASSWORD`, `DOSEWELL_KEY_ALIAS`, `DOSEWELL_KEY_PASSWORD`. The next push then produces an `.aab` signed with your key under Actions > Artifacts. Enrol in Play App Signing when you upload it. Locally, set `DOSEWELL_KEYSTORE_FILE` and the same three variables before running `scripts/build-android.sh`. The APK and bundle built so far use a throwaway test key; a phone that has the test build must uninstall it before installing the Play version.
+4. **Test on a real phone** – install `Dosewell-1.0.0.apk`. The app compiles and packages cleanly but has not yet been run on a device; see `TEST_REPORT.md`.
 5. **Play Console account** – one-time US$25. A personal account created after 13 November 2023 must run a closed test with at least 12 testers opted in for 14 continuous days before it can apply for production. Budget about three weeks.
 6. **Paid app** – set up a Google payments merchant profile in Play Console, then set the price under Monetise > App pricing. A paid app can later be made free, but a free app can never be made paid, so choose "Paid" before the first production release. No payment code is needed in the app, and the app shows no bank or UPI details (the Payments policy does not allow that).
 
@@ -20,10 +20,10 @@ Rules checked on 14 November 2026. Google changes these; re-check in Play Consol
 
 | Requirement | Status |
 | --- | --- |
-| Target API level 36 (Android 16), required for new apps since 31 Aug 2026 | Set in `android/variables.gradle` |
-| Android App Bundle (.aab) | `npm run android:release` or the GitHub workflow |
+| Target API level 36 (Android 16), required for new apps since 31 Aug 2026 | Set in `scripts/build-android.sh`; minimum Android 8.0 |
+| Android App Bundle (.aab) | `scripts/build-android.sh` or the GitHub workflow; passes `bundletool validate` |
 | 64-bit / 16 KB page size | No native libraries of our own |
-| Permissions | `POST_NOTIFICATIONS`, `SCHEDULE_EXACT_ALARM`, `RECEIVE_BOOT_COMPLETED`, `WAKE_LOCK` (from the notifications plugin), `INTERNET` (from the framework; the app makes no requests). No camera, SMS, contacts, location or storage permission. |
+| Permissions | `POST_NOTIFICATIONS`, `SCHEDULE_EXACT_ALARM`, `RECEIVE_BOOT_COMPLETED`, `VIBRATE`. No internet, camera, SMS, contacts, location or storage permission. |
 | Exact alarms | In Play Console, declare that exact alarms are core to the app: timed medicine reminders. The app works without the permission, with possible delays. |
 | Backup | Android cloud backup and device transfer are switched off for app data |
 

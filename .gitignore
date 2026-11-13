@@ -5,3 +5,6 @@ dist/
 *.jks
 .env
 .DS_Store
+build/
+.android-tools/
+signing/

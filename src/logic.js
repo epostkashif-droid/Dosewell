@@ -272,4 +272,4 @@ export function sampleState(now = Date.now()) {
 
 export function waNumber(phone, cc) { let d = String(phone || '').replace(/\D/g, '').replace(/^0+/, ''); if (d && d.length <= 10) d = (cc || '') + d; return d; }
 export const telHref = phone => String(phone || '').replace(/[^\d+]/g, '');
-export function notifId(s) { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0) % 2000000000 + 1; }
+export function notifId(s) { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0) % 999999999 + 1; }
