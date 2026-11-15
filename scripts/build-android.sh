@@ -7,11 +7,11 @@ cd "$(dirname "$0")/.."
 T="${SDK_TOOLS:-$PWD/.android-tools}"
 BT="$T/tools/build-tools"
 PKG=in.kaybuilds.dosewell
-VERSION_CODE="${VERSION_CODE:-1}"
-VERSION_NAME="${VERSION_NAME:-1.0.0}"
+VERSION_CODE="${VERSION_CODE:-2}"
+VERSION_NAME="${VERSION_NAME:-1.1.0}"
 MIN_SDK=26
 TARGET_SDK=36
-KS="${DOSEWELL_KEYSTORE_FILE:-$PWD/signing/dosewell-test.jks}"
+KS="${DOSEWELL_KEYSTORE_FILE:-$PWD/android/test-signing/dosewell-test.jks}"
 KS_PASS="${DOSEWELL_KEYSTORE_PASSWORD:-dosewell-test}"
 KS_ALIAS="${DOSEWELL_KEY_ALIAS:-dosewell}"
 KEY_PASS="${DOSEWELL_KEY_PASSWORD:-$KS_PASS}"
@@ -47,6 +47,7 @@ cp "$OUT/base.apk" "$OUT/unsigned.apk"
 rm -rf "$OUT/signed"
 java -jar "$T/uas.jar" -a "$OUT/aligned.apk" --ks "$KS" --ksAlias "$KS_ALIAS" --ksPass "$KS_PASS" --ksKeyPass "$KEY_PASS" --zipAlignPath "$BT/zipalign" -o "$OUT/signed" >/dev/null
 mkdir -p dist && cp "$OUT"/signed/*.apk "dist/Dosewell-$VERSION_NAME.apk"
+if [ "${SKIP_AAB:-}" = "1" ]; then ls -la dist/Dosewell-*; exit 0; fi
 
 # 5. App bundle for Play
 link -o "$OUT/proto.apk" --proto-format

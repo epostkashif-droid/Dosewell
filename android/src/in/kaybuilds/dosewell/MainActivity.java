@@ -305,9 +305,10 @@ public class MainActivity extends Activity {
             } catch (Exception ignored) { }
         }
 
-        @JavascriptInterface public void bars(final boolean dark) {
+        @JavascriptInterface public void bars(final boolean dark, final String color) {
             runOnUiThread(new Runnable() { @Override public void run() {
                 int bg = dark ? 0xFF16142A : 0xFFF6F4FB;
+                if (color != null && color.matches("#[0-9A-Fa-f]{6}")) { try { bg = android.graphics.Color.parseColor(color); } catch (Exception ignored) { } }
                 root.setBackgroundColor(bg); web.setBackgroundColor(bg); getWindow().getDecorView().setBackgroundColor(bg);
                 if (Build.VERSION.SDK_INT >= 30) {
                     WindowInsetsController c = getWindow().getInsetsController();

@@ -4,6 +4,7 @@ import {
   isDate, isId, isTime, str, blank, sanitizeState, sanitizeRecord, makeLogic, sampleState, waNumber, telHref
 } from './logic.js';
 import { native, store, reminders, sharing, clip, setBars, onAppEvents, HORIZON_DAYS } from './platform.js';
+import { THEMES, getTheme, shareColors } from './themes.js';
 
 /* ============ state ============ */
 let state = blank(), records = [];
@@ -29,11 +30,14 @@ function save() {
   syncTimer = setTimeout(syncReminders, 1200);
 }
 function syncReminders() { reminders.sync(L.upcoming(HORIZON_DAYS), state.people, state.settings); }
-let barsDark = null;
+let barsKey = null;
 function applyTheme() {
-  const t = state.settings.theme; if (t === 'system') delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = t;
+  const root = document.documentElement, t = state.settings.theme, sk = getTheme(state.settings.skin).id;
+  if (t === 'system') delete root.dataset.theme; else root.dataset.theme = t;
+  if (root.dataset.skin !== sk) root.dataset.skin = sk;
   let dark = t === 'dark'; try { if (t === 'system') dark = window.matchMedia('(prefers-color-scheme: dark)').matches; } catch (e) { /* ignore */ }
-  if (dark !== barsDark) { barsDark = dark; setBars(dark); }
+  const th = getTheme(sk), bg = dark ? th.dark.bg : th.light.bg, key = sk + dark;
+  if (key !== barsKey) { barsKey = key; setBars(dark, bg); }
 }
 
 /* ============ icons ============ */
@@ -190,7 +194,7 @@ function viewMore() {
   <section class="card"><ul class="list">
     ${remStatus.supported ? `<li><div class="grow"><strong>Phone notifications</strong><div class="small muted">${remStatus.allowed ? 'On. Reminders arrive even when Dosewell is closed, planned ' + HORIZON_DAYS + ' days ahead.' : 'Off. Turn on to get reminders.'}</div></div>${remStatus.allowed ? '<span class="pill ok">On</span>' : '<button class="btn sm" data-a="ask-notif">Turn on</button>'}</li>
     ${remStatus.allowed ? `<li><div class="grow"><strong>On-the-minute alarms</strong><div class="small muted">${remStatus.exact ? 'Allowed.' : 'Not allowed, so Android may delay a reminder by a few minutes.'}</div></div>${remStatus.exact ? '<span class="pill ok">On</span>' : '<button class="btn sm" data-a="ask-exact">Allow</button>'}</li>` : ''}` : ''}
-    ${sw('sound', st.sound, 'Alarm sound in the app', 'Chime when a dose is due and Dosewell is open')}
+    ${sw('sound', st.sound, 'Sounds in the app', 'The look\'s chime when a dose is due or marked taken, while Dosewell is open')}
     ${sw('followUp', st.followUp, 'Remind again after 45 minutes', 'If the dose is still not marked')}
     ${sw('discreet', st.discreet, 'Hide medicine names in notifications', 'Shows "Time for a medicine" instead')}
     <li><label class="f grow" for="set-threshold" style="color:var(--ink)">Guardian alert after<select id="set-threshold" data-set="threshold">${[2, 3, 4, 5, 6].map(n => `<option value="${n}" ${st.threshold === n ? 'selected' : ''}>${n} missed doses in a row</option>`).join('')}</select></label></li>
@@ -199,7 +203,8 @@ function viewMore() {
     <li><button class="btn wide" data-a="test-alarm">${svg('bell')}Test the alarm</button></li></ul>
     ${native ? '' : '<p class="small muted">In a browser, alarms ring only while this page is open. The Android app reminds you with notifications even when closed.</p>'}</section>
   <h2 class="section-h">Appearance</h2>
-  <section class="card"><div class="seg" role="group" aria-label="Theme">${[['system', 'Auto'], ['light', 'Light'], ['dark', 'Dark']].map(([k, l]) => `<button data-a="theme" data-t="${k}" aria-pressed="${st.theme === k}">${l}</button>`).join('')}</div></section>
+  <section class="card stack"><h2>Look</h2><p class="small muted">Each look changes the colours, background, lettering, movement and sounds.</p>${looksGrid()}
+    <h3>Light or dark</h3><div class="seg" role="group" aria-label="Light or dark">${[['system', 'Auto'], ['light', 'Light'], ['dark', 'Dark']].map(([k, l]) => `<button data-a="theme" data-t="${k}" aria-pressed="${st.theme === k}">${l}</button>`).join('')}</div></section>
   <h2 class="section-h">Your data</h2>
   <section class="card stack"><p class="small muted">${native ? 'Everything stays on this phone. Dosewell has no account, no server and no ads.' : store.synced ? 'Saved in your private space. Nobody else who opens this page can see it.' : 'Saved in this browser only.'}</p>
     <p class="small muted">A backup file is not locked. It holds health information, so keep it somewhere only you can reach.</p>
@@ -210,6 +215,12 @@ function viewMore() {
     <li><div class="grow"><strong>${esc(APP.name)} ${esc(APP.version)}</strong><div class="small muted">Made by ${esc(APP.maker)}, ${esc(APP.place)}</div>${APP.email ? `<div class="small"><a class="tel" href="mailto:${esc(APP.email)}">${esc(APP.email)}</a></div>` : ''}</div></li>
     <li><button class="rowbtn" data-a="privacy">${svg('shield')}<strong>Privacy policy</strong>${svg('chev').replace('<svg', '<svg class="chev"')}</button></li>
     <li><button class="rowbtn" data-a="disclaimer">${svg('heart')}<strong>Medical disclaimer</strong>${svg('chev').replace('<svg', '<svg class="chev"')}</button></li></ul></section>`;
+}
+function looksGrid() {
+  const cur = getTheme(state.settings.skin).id, dark = document.documentElement.dataset.theme === 'dark' || (state.settings.theme === 'system' && (() => { try { return window.matchMedia('(prefers-color-scheme: dark)').matches; } catch (e) { return false; } })());
+  return `<div class="looks" role="group" aria-label="Look">${THEMES.map(t => { const c = dark ? t.dark : t.light; return `<button class="look" data-a="skin" data-t="${t.id}" aria-pressed="${cur === t.id}" aria-label="${esc(t.name)}: ${esc(t.tagline)}">
+    <span class="pv" style="background:${c.bg};background-image:linear-gradient(135deg,${c['primary-soft']},${c.bg} 70%)">${cur === t.id ? `<span class="ok">${svg('check')}</span>` : ''}<i style="background:${c.primary}"></i><i style="background:${c.good}"></i><i style="background:${c.some}"></i><i style="background:${c.bad}"></i><b style="color:${c.ink};font-family:${t.display === 'Fraunces' ? 'Fraunces,serif' : t.display === 'Nunito' ? 'Nunito,sans-serif' : t.display === 'Atkinson' ? 'Atkinson,sans-serif' : 'Jakarta,sans-serif'}">Aa</b></span>
+    <span class="nm"><strong>${esc(t.name)}</strong><span>${esc(t.tagline)}</span></span></button>`; }).join('')}</div>`;
 }
 const DISCLAIMER = `<p>Dosewell is a reminder and record-keeping tool. It does not give medical advice, diagnose, or recommend any medicine or dose.</p><p>Always follow your doctor's or pharmacist's instructions. Do not start, stop or change a medicine because of anything shown in this app. Talk to a qualified healthcare professional first.</p><p>A reminder can be delayed or missed if the phone is off, silenced, out of battery, or if notifications are blocked. Do not rely on Dosewell alone for medicines where timing is critical.</p><p>In an emergency, call your local emergency number.</p>`;
 const PRIVACY = `<p><strong>Short version: your information stays with you.</strong></p>
@@ -222,7 +233,8 @@ const PRIVACY = `<p><strong>Short version: your information stays with you.</str
 <h3>Contact</h3><p>${esc(APP.maker)}, ${esc(APP.place)}${APP.email ? '. ' + esc(APP.email) : ''}.</p>`;
 function viewOnboarding() {
   const dots = `<div class="dots">${[0, 1, 2].map(i => `<i class="${i === onbStep ? 'on' : ''}"></i>`).join('')}</div>`;
-  if (onbStep === 0) return `<div class="stack onb" style="gap:20px">${ART}<div class="stack" style="text-align:center"><h1>Never miss a dose</h1><p class="muted">Reminders for you, your parents and your children. A record of every dose, and a nudge to a guardian when doses are missed.</p></div>${dots}<button class="btn primary wide" data-a="onb-next">Get started</button></div>`;
+  if (onbStep === 0) return `<div class="stack onb" style="gap:20px">${ART}<div class="stack" style="text-align:center"><h1>Never miss a dose</h1><p class="muted">Reminders for you, your parents and your children. A record of every dose, and a nudge to a guardian when doses are missed.</p></div>
+    <div class="stack" style="gap:8px;text-align:center"><p class="small muted">Pick a look. You can change it any time.</p><div class="swatches" role="group" aria-label="Look">${THEMES.map(t => `<button class="swatch" data-a="skin" data-t="${t.id}" aria-pressed="${getTheme(state.settings.skin).id === t.id}" aria-label="${esc(t.name)}" style="background:linear-gradient(135deg,${t.light['primary-soft']} 0 50%,${t.light.primary} 50%)"></button>`).join('')}</div><p class="small" style="font-weight:800">${esc(getTheme(state.settings.skin).name)}</p></div>${dots}<button class="btn primary wide" data-a="onb-next">Get started</button></div>`;
   if (onbStep === 1) return `<div class="stack onb" style="gap:16px"><h1>Before you begin</h1><div class="card prose">${svg('heart').replace('<svg', '<svg width="28" height="28" style="color:var(--rose-ink)"')}<p>Dosewell reminds and records. It does not give medical advice. Always follow your doctor or pharmacist.</p></div><div class="card prose">${svg('shield').replace('<svg', '<svg width="28" height="28" style="color:var(--mint-ink)"')}<p>${native ? 'Your information stays on this phone. No account, no server, no ads.' : 'Your information stays private to you. No ads, no trackers.'}</p></div>
     <label class="check" for="onb-ok"><input type="checkbox" id="onb-ok"> I understand that Dosewell is not a substitute for medical advice.</label>
     <div class="btnrow"><button class="btn quiet" data-a="disclaimer">Read the full disclaimer</button><button class="btn quiet" data-a="privacy">Privacy policy</button></div>${dots}<button class="btn primary wide" data-a="onb-accept">Continue</button></div>`;
@@ -231,14 +243,19 @@ function viewOnboarding() {
     <label class="f" for="p-rel">Relation<select id="p-rel" name="relation">${opt(RELATIONS, 'Self')}</select></label></div>${dots}
     <button class="btn primary wide">Continue</button></form><button class="btn quiet wide" data-a="try-sample">Explore with sample data first</button></div>`;
 }
+let animateNext = false, justTaken = null;
 function render() {
   applyTheme();
   const onb = !state.settings.onboarded;
   $('#navwrap').hidden = onb;
-  if (onb) { $('#fab').hidden = true; $('#app').innerHTML = viewOnboarding(); return; }
+  const appEl = $('#app');
+  if (onb) { $('#fab').hidden = true; appEl.innerHTML = viewOnboarding(); return; }
+  const prevTab = tab;
   tab = TABS.some(x => '#' + x[0] === location.hash) ? location.hash.slice(1) : 'today';
   if (who && !person(who)) who = null;
-  $('#app').innerHTML = { today: viewToday, meds: viewMeds, records: viewRecords, progress: viewProgress, more: viewMore }[tab]();
+  appEl.innerHTML = { today: viewToday, meds: viewMeds, records: viewRecords, progress: viewProgress, more: viewMore }[tab]();
+  if (tab !== prevTab || animateNext) { animateNext = false; appEl.classList.remove('enter'); void appEl.offsetWidth; appEl.classList.add('enter'); setTimeout(() => appEl.classList.remove('enter'), 700); }
+  if (justTaken) { for (const el of appEl.querySelectorAll('.dose')) { const b = el.querySelector('.tick'); if (b && b.dataset.k === justTaken.k && b.dataset.d === justTaken.d) el.classList.add('just-taken'); } justTaken = null; }
   $('#nav').innerHTML = TABS.map(([k, l]) => `<a href="#${k}" ${k === tab ? 'aria-current="page"' : ''}><i>${svg(k)}</i><span>${l}</span></a>`).join('');
   const fab = $('#fab'), showFab = (tab === 'today' || tab === 'meds') ? state.people.length > 0 : tab === 'records';
   fab.hidden = !showFab; fab.innerHTML = svg('plus'); fab.setAttribute('aria-label', tab === 'records' ? 'Add a record' : 'Add a medicine');
@@ -373,18 +390,19 @@ function rr(x, a, b, w, h, r) { x.beginPath(); x.moveTo(a + r, b); x.arcTo(a + w
 async function shareSheet(pid) {
   const p = person(pid); if (!p) return; try { await document.fonts.ready; } catch (e) { /* ignore */ }
   const s = L.streak(pid), a = L.adherence(pid, 30), t = today();
-  const c = document.createElement('canvas'); c.width = 1080; c.height = 1350; const x = c.getContext('2d'), f = (w, px) => `${w} ${px}px Jakarta, "Segoe UI", Roboto, sans-serif`;
-  x.fillStyle = '#EDE9FB'; x.fillRect(0, 0, 1080, 1350);
-  x.fillStyle = '#FFFFFF'; rr(x, 60, 60, 960, 1230, 64); x.fill();
-  x.textBaseline = 'top'; x.fillStyle = '#6457C9'; x.font = f(800, 36); x.fillText('Dosewell', 120, 120);
-  x.fillStyle = '#2A2640'; x.font = f(800, 76); let nm = p.name; while (x.measureText(nm).width > 820 && nm.length > 3) nm = nm.slice(0, -2) + '…'; x.fillText(nm, 120, 190);
-  x.fillStyle = '#FFF1C7'; rr(x, 120, 320, 840, 280, 48); x.fill();
-  x.fillStyle = '#7A5C00'; x.font = f(800, 190); x.fillText(String(s), 160, 350); const w = x.measureText(String(s)).width;
+  const K = shareColors(state.settings.skin);
+  const c = document.createElement('canvas'); c.width = 1080; c.height = 1350; const x = c.getContext('2d'), f = (w, px) => `${w} ${px}px ${K.font}`;
+  x.fillStyle = K.frame; x.fillRect(0, 0, 1080, 1350);
+  x.fillStyle = K.card; rr(x, 60, 60, 960, 1230, 64); x.fill();
+  x.textBaseline = 'top'; x.fillStyle = K.brand; x.font = f(800, 36); x.fillText('Dosewell', 120, 120);
+  x.fillStyle = K.ink; x.font = f(800, 76); let nm = p.name; while (x.measureText(nm).width > 820 && nm.length > 3) nm = nm.slice(0, -2) + '…'; x.fillText(nm, 120, 190);
+  x.fillStyle = K.tile; rr(x, 120, 320, 840, 280, 48); x.fill();
+  x.fillStyle = K.tileInk; x.font = f(800, 190); x.fillText(String(s), 160, 350); const w = x.measureText(String(s)).width;
   x.font = f(800, 56); x.fillText(s === 1 ? 'day' : 'days', 190 + w, 392); x.fillText('in a row', 190 + w, 462);
-  const col = { full: '#8FD9B6', partial: '#FFD98A', none: '#F5A9BB', pending: '#E6E2F1', empty: '#F1EEF8' };
+  const col = { full: K.full, partial: K.partial, none: K.none, pending: K.pending, empty: K.empty };
   for (let i = 0; i < 28; i++) { const st = L.dayStatus(addDays(t, -(27 - i)), pid), cx = 120 + (i % 7) * 122, cy = 660 + Math.floor(i / 7) * 122; x.fillStyle = col[st]; rr(x, cx, cy, 106, 106, 26); x.fill(); }
-  x.fillStyle = '#2A2640'; x.font = f(700, 40); x.fillText(a.pct === null ? 'Just getting started' : a.pct + '% of doses taken in the last 30 days', 120, 1170);
-  x.fillStyle = '#676280'; x.font = f(500, 30); x.fillText('Last 28 days · ' + niceDate(t), 120, 1226);
+  x.fillStyle = K.ink; x.font = f(700, 40); x.fillText(a.pct === null ? 'Just getting started' : a.pct + '% of doses taken in the last 30 days', 120, 1170);
+  x.fillStyle = K.muted; x.font = f(500, 30); x.fillText('Last 28 days · ' + niceDate(t), 120, 1226);
   shareCanvas = c; shareMsg = shareText(p);
   openSheet(`<h2>Share ${esc(p.name)}'s streak</h2><img class="share-img" src="${c.toDataURL('image/png')}" alt="${esc(p.name)}: ${s} day streak">
     <textarea class="copybox" id="s-msg" readonly style="min-height:84px">${esc(shareMsg)}</textarea>
@@ -405,9 +423,23 @@ function notifPrompt() { openSheet(`<div class="row"><span class="tile av-0">${s
 /* ============ in-app alarm ============ */
 let actx = null, alarmKeys = '', chimeTimer = null, testAlarm = false; const silenced = Object.create(null);
 function unlockAudio() { try { actx = actx || new (window.AudioContext || window.webkitAudioContext)(); if (actx.state === 'suspended') actx.resume(); } catch (e) { /* no audio */ } }
+// Plays one of the look's sounds: each note is [frequency, start, length, relative volume, sweep-to frequency].
+function play(spec) {
+  if (!state.settings.sound || !actx || !spec) return;
+  try {
+    const t0 = actx.currentTime + .02;
+    for (const [f, d, len, rel = 1, to] of spec.notes) {
+      const o = actx.createOscillator(), g = actx.createGain(), peak = spec.gain * rel, end = t0 + d + (spec.decay ? Math.max(len, spec.decay) : len);
+      o.type = spec.wave; o.frequency.setValueAtTime(f, t0 + d);
+      if (spec.sweep && to) o.frequency.exponentialRampToValueAtTime(to, t0 + d + len);
+      g.gain.setValueAtTime(0, t0 + d); g.gain.linearRampToValueAtTime(peak, t0 + d + .015); g.gain.exponentialRampToValueAtTime(.0008, end);
+      o.connect(g).connect(actx.destination); o.start(t0 + d); o.stop(end + .05);
+    }
+  } catch (e) { /* no audio */ }
+}
+const sounds = () => getTheme(state.settings.skin).sound;
 function chime() {
-  if (!state.settings.sound || !actx) return;
-  try { const t0 = actx.currentTime;[[880, 0], [1175, .18], [1568, .36], [1175, .7], [1568, .88]].forEach(([f, d]) => { const o = actx.createOscillator(), g = actx.createGain(); o.type = 'sine'; o.frequency.value = f; g.gain.setValueAtTime(0, t0 + d); g.gain.linearRampToValueAtTime(.35, t0 + d + .02); g.gain.exponentialRampToValueAtTime(.001, t0 + d + .32); o.connect(g).connect(actx.destination); o.start(t0 + d); o.stop(t0 + d + .35); }); } catch (e) { /* ignore */ }
+  play(sounds().alarm);
   try { navigator.vibrate && navigator.vibrate([250, 120, 250]); } catch (e) { /* ignore */ }
 }
 const dueList = () => { const now = Date.now(); return L.dueNow(now).filter(d => !((silenced[d.date + '|' + d.key] || 0) > now)); };
@@ -433,6 +465,8 @@ const stamp = () => { const n = new Date(); return 't' + pad(n.getHours()) + pad
 function takeDose(ds, key) {
   if (!L.markDose(ds, key, stamp())) return false;
   save(); reminders.clearDelivered(ds, key);
+  justTaken = { d: ds, k: key }; unlockAudio(); play(sounds().taken);
+  try { navigator.vibrate && navigator.vibrate(30); } catch (e) { /* ignore */ }
   const m = med(key.split('|')[0]), p = m && person(m.personId);
   if (p && ds === today() && L.dayStatus(ds, p.id) === 'full') { const s = L.streak(p.id); toast(s > 1 ? `All done for ${p.name} today. ${s}-day streak.` : `All done for ${p.name} today.`); }
   return true;
@@ -446,6 +480,7 @@ const A = {
   day: d => { if (isDate(d.d) && d.d <= today()) { viewDate = d.d; render(); } },
   rtype: d => { recFilter = ['All', ...REC_TYPES].includes(d.t) ? d.t : 'All'; render(); },
   theme: d => { state.settings.theme = d.t; save(); render(); },
+  skin: d => { const t = getTheme(d.t); if (t.id === state.settings.skin) return; state.settings.skin = t.id; save(); animateNext = true; render(); unlockAudio(); play(t.sound.taken); if (state.settings.onboarded) toast('Look: ' + t.name); },
   dose: d => doseSheet(d.d, d.k),
   take: d => { if (takeDose(d.d, d.k)) { closeSheet(); render(); } },
   skip: d => { if (L.markDose(d.d, d.k, 's')) { save(); reminders.clearDelivered(d.d, d.k); } closeSheet(); render(); },
@@ -453,7 +488,7 @@ const A = {
   'onb-next': () => { onbStep = 1; render(); window.scrollTo(0, 0); },
   'onb-accept': () => { if (!$('#onb-ok').checked) { toast('Please tick the box to continue'); return; } onbStep = 2; render(); window.scrollTo(0, 0); },
   'try-sample': () => { state = sampleState(); save(); render(); afterOnboarding(); },
-  'start-fresh': () => { const st = state.settings; state = blank(); state.settings = Object.assign(state.settings, { onboarded: true, theme: st.theme, sound: st.sound }); who = null; save(); render(); personSheet(); },
+  'start-fresh': () => { const st = state.settings; state = blank(); state.settings = Object.assign(state.settings, { onboarded: true, theme: st.theme, skin: st.skin, sound: st.sound }); who = null; save(); render(); personSheet(); },
   'edit-med': d => medSheet(d.id),
   'edit-person': d => personSheet(d.id),
   'edit-contact': d => contactSheet(d.id),

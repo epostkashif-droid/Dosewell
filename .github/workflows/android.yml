@@ -18,18 +18,23 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: bash scripts/fetch-android-tools.sh
-      - name: Restore the release keystore (only when the secrets exist; otherwise a throwaway test key is used)
+      - name: Build
         env:
           KEYSTORE_B64: ${{ secrets.DOSEWELL_KEYSTORE_BASE64 }}
+          STORE_PASS: ${{ secrets.DOSEWELL_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.DOSEWELL_KEY_ALIAS }}
+          KEY_PASS: ${{ secrets.DOSEWELL_KEY_PASSWORD }}
         run: |
-          if [ -n "$KEYSTORE_B64" ]; then echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/dosewell.jks"; echo "DOSEWELL_KEYSTORE_FILE=$RUNNER_TEMP/dosewell.jks" >> "$GITHUB_ENV"; fi
-      - name: Build APK and app bundle
-        env:
-          DOSEWELL_KEYSTORE_PASSWORD: ${{ secrets.DOSEWELL_KEYSTORE_PASSWORD }}
-          DOSEWELL_KEY_ALIAS: ${{ secrets.DOSEWELL_KEY_ALIAS }}
-          DOSEWELL_KEY_PASSWORD: ${{ secrets.DOSEWELL_KEY_PASSWORD }}
-        run: |
-          [ -n "$DOSEWELL_KEYSTORE_PASSWORD" ] || unset DOSEWELL_KEYSTORE_PASSWORD DOSEWELL_KEY_ALIAS DOSEWELL_KEY_PASSWORD
-          bash scripts/build-android.sh
+          # Every build gets a higher version code, as Google Play requires.
+          export VERSION_CODE=$((GITHUB_RUN_NUMBER + 10))
+          if [ -n "$KEYSTORE_B64" ]; then
+            # Your own upload key: builds the APK and the .aab to upload to Play.
+            echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/dosewell.jks"
+            export DOSEWELL_KEYSTORE_FILE="$RUNNER_TEMP/dosewell.jks" DOSEWELL_KEYSTORE_PASSWORD="$STORE_PASS" DOSEWELL_KEY_ALIAS="$KEY_ALIAS" DOSEWELL_KEY_PASSWORD="$KEY_PASS"
+            bash scripts/build-android.sh
+          else
+            # No upload key yet: a test APK signed with the repository's test key (not for Play).
+            SKIP_AAB=1 bash scripts/build-android.sh
+          fi
       - uses: actions/upload-artifact@v4
-        with: { name: dosewell-android, path: "dist/Dosewell-*" }
+        with: { name: dosewell-android, path: "dist/Dosewell-*", if-no-files-found: error }

@@ -1,6 +1,6 @@
 # Test and security report
 
-Dosewell 1.0.0, 14 November 2026. Tested as built from this repository.
+Dosewell 1.1.0, 15 November 2026. Tested as built from this repository.
 
 ## What was run
 
@@ -8,8 +8,8 @@ Dosewell 1.0.0, 14 November 2026. Tested as built from this repository.
 | --- | --- |
 | Logic unit tests (`tests/logic.test.mjs`) | 18 of 18 passed |
 | Fuzz: 400 randomly generated, partly corrupt data sets | Passed, no exceptions, all invariants held |
-| Colour contrast, light and dark (`tests/contrast.test.mjs`) | 12 text/background pairs per theme, all at least 4.5:1 |
-| Browser tests in headless Chrome (`tests/e2e.py`) | 81 of 81 passed |
+| Colour contrast for all five looks, light and dark (`tests/contrast.test.mjs`) | 16 text/background pairs in each of 10 palettes, all at least 4.5:1 |
+| Browser tests in headless Chrome (`tests/e2e.py`) | 94 of 94 passed |
 | Dependency audit (`npm audit`) | 0 known vulnerabilities |
 
 ## What was NOT tested
@@ -36,6 +36,8 @@ Dosewell 1.0.0, 14 November 2026. Tested as built from this repository.
 | 12 | Health data was included in Android cloud backup by default | Backup and device transfer switched off |
 | 13 | Medicine names showed on the lock screen | Notifications are private on the lock screen; optional "hide medicine names" |
 | 14 | No disclaimer, privacy policy or maker details | First-run disclaimer that must be accepted; both documents in the app; About section |
+| 15 | Two looks failed contrast for button text on pale fills | Darkened their accent colours |
+| 16 | The Ocean look's slide-in motion briefly made the page scroll sideways | Page now clips horizontal overflow |
 
 ## Security posture
 
@@ -113,6 +115,19 @@ Dosewell 1.0.0, 14 November 2026. Tested as built from this repository.
 - medicine form fits at 768px
 - every tappable control is at least 40px
 - every form field has a label
+- lilac light: look applies and every tab fits 320px
+- lilac dark: look applies and every tab fits 320px
+- garden light: look applies and every tab fits 320px
+- garden dark: look applies and every tab fits 320px
+- sunset light: look applies and every tab fits 320px
+- sunset dark: look applies and every tab fits 320px
+- ocean light: look applies and every tab fits 320px
+- ocean dark: look applies and every tab fits 320px
+- clear light: look applies and every tab fits 320px
+- clear dark: look applies and every tab fits 320px
+- look can be picked on the welcome screen
+- chosen look survives a restart
+- an unknown look falls back to the default
 - app still works when the phone refuses storage
 - corrupted saved data cannot crash start-up: not json
 - corrupted saved data cannot crash start-up: {"people":"x","meds":7}
@@ -132,7 +147,7 @@ Dosewell 1.0.0, 14 November 2026. Tested as built from this repository.
 - share picture, copy and backup go through the phone bridge
 - app restores from the phone's storage after a restart
 - no security-policy violations while running as the Android app
-- 689 random taps and junk entries cause no script errors
+- 681 random taps and junk entries cause no script errors
 - random tapping leaves no injected markup
 - saved data is still valid after random tapping
 - no uncaught script errors in any test

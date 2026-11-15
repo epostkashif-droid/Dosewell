@@ -1,3 +1,4 @@
+import { THEME_IDS } from './themes.js';
 // Dosewell core logic: pure functions, no DOM. Shared by the app and the test suite.
 export const pad = n => String(n).padStart(2, '0');
 export const ymd = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
@@ -43,7 +44,7 @@ const arr = v => Array.isArray(v) ? v : [];
 export function blank() {
   return {
     v: 1, people: [], meds: [], logs: {}, contacts: [],
-    settings: { sound: true, threshold: 3, snooze: 10, cc: '91', ack: {}, followUp: true, discreet: false, theme: 'system', onboarded: false },
+    settings: { sound: true, threshold: 3, snooze: 10, cc: '91', ack: {}, followUp: true, discreet: false, theme: 'system', skin: 'lilac', onboarded: false },
     updatedAt: 0
   };
 }
@@ -110,6 +111,7 @@ export function sanitizeState(raw) {
   s.settings.followUp = st.followUp !== false;
   s.settings.discreet = st.discreet === true;
   s.settings.theme = oneOf(st.theme, ['system', 'light', 'dark'], 'system');
+  s.settings.skin = oneOf(st.skin, THEME_IDS, 'lilac');
   s.settings.onboarded = st.onboarded === true;
   const ack = obj(st.ack);
   for (const k of Object.keys(ack)) if (seen.has(k) && typeof ack[k] === 'string') s.settings.ack[k] = str(ack[k], 80);

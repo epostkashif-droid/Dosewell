@@ -130,5 +130,5 @@ export const sharing = {
   }
 };
 export function clip(text) { if (!native) return false; try { N.copy(text); return true; } catch (e) { return false; } }
-export function setBars(dark) { if (native) { try { N.bars(!!dark); } catch (e) { /* ignore */ } } }
+export function setBars(dark, bg) { if (native) { try { N.bars(!!dark, String(bg || '')); } catch (e) { /* ignore */ } } }
 export function onAppEvents({ back, resume }) { window.__dwBack = back; window.__dwResume = resume; }

@@ -211,7 +211,7 @@ window.DosewellNative = {
   takePending(){ const p = window.__store.pending; window.__store.pending = '[]'; return p }, setSnooze(m){ rec('setSnooze', arguments) }, clearDelivered(i){ rec('clearDelivered', arguments) },
   saveState(j){ window.__store.state = j; try { sessionStorage.setItem('nstate', j) } catch (e) {} }, loadState(){ try { return sessionStorage.getItem('nstate') || '' } catch (e) { return '' } },
   recordIds(){ return JSON.stringify(Object.keys(window.__store.recs)) }, readRecord(i){ return window.__store.recs[i] || '' }, writeRecord(i, j){ window.__store.recs[i] = j; return true }, deleteRecord(i){ delete window.__store.recs[i] },
-  copy(t){ rec('copy', arguments) }, shareText(t){ rec('shareText', arguments) }, shareImage(b, t){ rec('shareImage', [b.length, t]) }, shareFile(n, t){ rec('shareFile', [n, t.length]) }, bars(d){ rec('bars', arguments) }
+  copy(t){ rec('copy', arguments) }, shareText(t){ rec('shareText', arguments) }, shareImage(b, t){ rec('shareImage', [b.length, t]) }, shareFile(n, t){ rec('shareFile', [n, t.length]) }, bars(d, c){ rec('bars', arguments) }
 };
 """
 async def android_shell(b):
@@ -255,12 +255,39 @@ async def android_shell(b):
     check("no security-policy violations while running as the Android app", not [c for c in csp if "Content Security Policy" in c], csp[:2])
     await ctx.close()
 
+async def looks(b):
+    """Every look, in light and dark, at narrow and wide widths, with hostile data: no sideways scroll, no script errors."""
+    st, recs = hostile_state()
+    for sk in ["lilac", "garden", "sunset", "ocean", "clear"]:
+        for scheme in ["light", "dark"]:
+            ctx, pg = await new_page(b, width=320, height=740, color_scheme=scheme)
+            s2 = json.loads(json.dumps(st)); s2["settings"]["skin"] = sk
+            await pg.evaluate("([s, r]) => window.__dosewell.load(s, r)", [s2, recs]); await pg.wait_for_timeout(120)
+            applied = await pg.evaluate("() => document.documentElement.dataset.skin")
+            bad = []
+            for t in TABS:
+                await goto_tab(pg, t)
+                if not await no_overflow(pg): bad.append(t)
+            check(f"{sk} {scheme}: look applies and every tab fits 320px", applied == sk and not bad, (applied, bad))
+            await ctx.close()
+    ctx, pg = await new_page(b)
+    await pg.click('[data-a="skin"][data-t="garden"]'); await pg.wait_for_timeout(100)
+    check("look can be picked on the welcome screen", await pg.evaluate("() => document.documentElement.dataset.skin") == "garden")
+    await pg.click('[data-a="onb-next"]'); await pg.check("#onb-ok"); await pg.click('[data-a="onb-accept"]'); await pg.click('[data-a="try-sample"]'); await pg.wait_for_timeout(150)
+    if await pg.is_visible('#alarm.open'): await pg.click('[data-a="alarm-close"]')
+    await goto_tab(pg, "more"); await pg.click('[data-a="skin"][data-t="sunset"]'); await pg.wait_for_timeout(100)
+    await pg.reload(); await pg.wait_for_timeout(300)
+    check("chosen look survives a restart", await pg.evaluate("() => document.documentElement.dataset.skin") == "sunset")
+    await pg.evaluate("() => window.__dosewell.load({settings:{onboarded:true, skin:'<script>'}}, [])")
+    check("an unknown look falls back to the default", await pg.evaluate("() => document.documentElement.dataset.skin") == "lilac")
+    await ctx.close()
+
 async def main():
     srv = subprocess.Popen([sys.executable, "-m", "http.server", "8766", "--directory", os.path.join(ROOT, "www")], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL); time.sleep(1)
     try:
         async with async_playwright() as p:
             b = await p.chromium.launch(executable_path=CHROME, args=["--no-sandbox"])
-            for part in (flow, guardian, injection, layout, resilience, android_shell, monkey):
+            for part in (flow, guardian, injection, layout, looks, resilience, android_shell, monkey):
                 try: await part(b)
                 except Exception as e: check(part.__name__ + " ran to the end", False, repr(e)[:300])
             await b.close()
