@@ -7,8 +7,8 @@ cd "$(dirname "$0")/.."
 T="${SDK_TOOLS:-$PWD/.android-tools}"
 BT="$T/tools/build-tools"
 PKG=in.kaybuilds.dosewell
-VERSION_CODE="${VERSION_CODE:-2}"
-VERSION_NAME="${VERSION_NAME:-1.1.0}"
+VERSION_CODE="${VERSION_CODE:-3}"
+VERSION_NAME="${VERSION_NAME:-1.2.0}"
 MIN_SDK=26
 TARGET_SDK=36
 KS="${DOSEWELL_KEYSTORE_FILE:-$PWD/android/test-signing/dosewell-test.jks}"

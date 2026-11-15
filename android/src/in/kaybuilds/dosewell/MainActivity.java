@@ -293,6 +293,51 @@ public class MainActivity extends Activity {
             } catch (Exception ignored) { }
         }
 
+        private String safeName(String name, String fallback) {
+            String n = name == null ? fallback : name.replaceAll("[^A-Za-z0-9._-]", "_");
+            return (n.startsWith(".") || n.length() > 80 || n.length() == 0) ? fallback : n;
+        }
+
+        private String safeMime(String mime) { return "image/png".equals(mime) || "image/webp".equals(mime) ? mime : "image/jpeg"; }
+
+        /** Saves a record photo to Downloads/Dosewell. Android 9 and older get the share menu instead (no storage permission needed). */
+        @JavascriptInterface public String saveImage(String name, String mime, String b64) {
+            try {
+                byte[] bytes = Base64.decode(b64, Base64.DEFAULT);
+                if (bytes.length == 0 || bytes.length > 5000000) return "";
+                String n = safeName(name, "dosewell-record.jpg"), m = safeMime(mime);
+                if (Build.VERSION.SDK_INT >= 29) {
+                    android.content.ContentValues v = new android.content.ContentValues();
+                    v.put(MediaStore.MediaColumns.DISPLAY_NAME, n);
+                    v.put(MediaStore.MediaColumns.MIME_TYPE, m);
+                    v.put(MediaStore.MediaColumns.RELATIVE_PATH, android.os.Environment.DIRECTORY_DOWNLOADS + "/Dosewell");
+                    v.put(MediaStore.MediaColumns.IS_PENDING, 1);
+                    android.content.ContentResolver cr = getContentResolver();
+                    Uri u = cr.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, v);
+                    if (u == null) return "";
+                    java.io.OutputStream o = cr.openOutputStream(u);
+                    if (o == null) { cr.delete(u, null, null); return ""; }
+                    try { o.write(bytes); } finally { o.close(); }
+                    v.clear(); v.put(MediaStore.MediaColumns.IS_PENDING, 0); cr.update(u, v, null, null);
+                    return "saved";
+                }
+                shareB64(n, m, b64, "");
+                return "shared";
+            } catch (Exception e) { return ""; }
+        }
+
+        @JavascriptInterface public void shareB64(String name, String mime, String b64, final String text) {
+            try {
+                final String m = safeMime(mime);
+                final Uri u = writeShare(safeName(name, "dosewell-record.jpg"), Base64.decode(b64, Base64.DEFAULT));
+                runOnUiThread(new Runnable() { @Override public void run() {
+                    Intent i = new Intent(Intent.ACTION_SEND).setType(m).putExtra(Intent.EXTRA_STREAM, u);
+                    if (text != null && text.length() > 0) i.putExtra(Intent.EXTRA_TEXT, text);
+                    i.setClipData(ClipData.newRawUri("record", u)); i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION); send(i);
+                } });
+            } catch (Exception ignored) { }
+        }
+
         @JavascriptInterface public void shareFile(String name, String text) {
             try {
                 String safe = name == null ? "dosewell-backup.json" : name.replaceAll("[^A-Za-z0-9._-]", "_");

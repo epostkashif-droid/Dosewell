@@ -5,11 +5,12 @@ Made by Kashif Nowman Kanak, Chennai, India.
 
 - Reminders at each dose time as phone notifications, with Taken and Snooze buttons, and a second nudge after 45 minutes
 - One-tap dose tracking, with a seven-day organiser and a full history
-- Guardian alert after a set number of missed doses in a row, sent by WhatsApp, SMS or a call with the message already written
+- Guardian alert after a set number of missed doses in a row, to the guardian's WhatsApp number (with its own country code), by WhatsApp, SMS or a call with the message already written
 - Emergency card per person: blood group, allergies, conditions, current medicines, doctor, who to call
-- Photos of prescriptions, lab reports and bills
+- Photos of prescriptions, lab reports and bills, with a full-screen viewer (pinch or double-tap to zoom, drag, turn) and Save to Downloads or Share
 - Streaks, milestones and a shareable streak picture
 - Five looks (Lavender, Garden, Sunset, Ocean, Clear), each with its own colours, background, lettering, movement and sounds, in light and dark. Clear is large and high-contrast for older eyes
+- Made for older users: large labelled Take buttons, one-tap time choices (Morning, Afternoon, Evening, Night), three text sizes, four plain tabs
 - Refill warnings, a 30-day report for the doctor, backup and restore
 - Everything stays on the phone: no account, no server, no ads, no analytics, and no internet permission
 

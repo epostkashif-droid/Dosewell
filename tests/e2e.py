@@ -49,12 +49,18 @@ async def flow(b):
     await pg.check("#onb-ok"); await pg.click('[data-a="onb-accept"]')
     await pg.fill("#p-name", "Amma"); await pg.select_option("#p-rel", "Mother"); await pg.click('form[data-form="person"] .btn.primary')
     check("onboarding ends on Today with an add-medicine prompt", await pg.is_visible("text=No medicines yet"))
-    await pg.click("#fab"); await pg.fill("#m-name", "Metformin"); await pg.fill("#m-str", "500 mg")
-    await pg.fill('#times input[type=time]', "00:00"); await pg.click('[data-a="add-time"]'); await pg.locator('#times input[type=time]').nth(1).fill("23:59")
-    await pg.fill("#m-stock", "3"); await pg.click('form[data-form="med"] .btn.primary'); await pg.wait_for_timeout(200)
+    await pg.locator('[data-a="edit-med"]').first.click(); await pg.fill("#m-name", "Metformin")
+    check("new medicine starts with Morning ticked and After food chosen", await pg.is_checked('input[name=time][value="08:00"]') and await pg.is_checked('input[name=food][value="After food"]'))
+    await pg.uncheck('input[name=time][value="08:00"]', force=True)
+    await pg.click('form[data-form="med"] .btn.primary'); await pg.wait_for_timeout(100)
+    check("saving with no time chosen is refused", await pg.is_visible("#m-name"))
+    await pg.click('[data-a="add-time"]'); await pg.locator('#times input[type=time]').nth(0).fill("00:00"); await pg.click('[data-a="add-time"]'); await pg.locator('#times input[type=time]').nth(1).fill("23:59")
+    await pg.click("details summary"); await pg.fill("#m-str", "500 mg"); await pg.fill("#m-stock", "3"); await pg.click('form[data-form="med"] .btn.primary'); await pg.wait_for_timeout(200)
     rows = await pg.locator(".dose").count()
     check("a medicine added today lists only doses still ahead (no instant misses)", rows >= 1 and not await pg.is_visible(".pill.bad"), rows)
-    await pg.locator(".dose .tick").first.click(); await pg.wait_for_timeout(150)
+    take = pg.locator(".dose .tick.take").first; tb = await take.bounding_box()
+    check("the Take button is large and labelled", tb and tb["height"] >= 54 and tb["width"] >= 100 and "Take" in await take.inner_text(), tb)
+    await take.click(); await pg.wait_for_timeout(150)
     check("one tap marks a dose taken", await pg.locator(".dose.is-taken").count() == 1)
     st = await pg.evaluate("() => window.__dosewell.get()")
     check("stock decreases when taken", st["meds"][0]["stock"] == 2, st["meds"][0]["stock"])
@@ -64,14 +70,19 @@ async def flow(b):
     st = await pg.evaluate("() => window.__dosewell.get()")
     check("undo restores the dose and the stock", await pg.locator(".dose.is-taken").count() == 0 and st["meds"][0]["stock"] == 3)
     # validation
-    await pg.click("#fab"); await pg.fill("#m-name", "   "); await pg.click('form[data-form="med"] .btn.primary'); await pg.wait_for_timeout(100)
+    await goto_tab(pg, "meds"); await pg.click('[data-a="edit-med"]'); await pg.fill("#m-name", "   "); await pg.click('form[data-form="med"] .btn.primary'); await pg.wait_for_timeout(100)
     check("blank medicine name is rejected", await pg.is_visible("#m-name"))
-    await pg.fill("#m-name", "X"); await pg.fill("#m-start", "2026-12-10"); await pg.fill("#m-end", "2026-12-01"); await pg.click('form[data-form="med"] .btn.primary'); await pg.wait_for_timeout(100)
+    await pg.click("details summary"); await pg.fill("#m-name", "X"); await pg.fill("#m-start", "2026-12-10"); await pg.fill("#m-end", "2026-12-01"); await pg.click('form[data-form="med"] .btn.primary'); await pg.wait_for_timeout(100)
     check("end date before start date is rejected", await pg.is_visible("#m-name"))
     await pg.keyboard.press("Escape"); check("Escape closes a sheet", not await pg.is_visible("#panel"))
     # contact + guardian
-    await goto_tab(pg, "more"); await pg.click('[data-a="edit-contact"]'); await pg.fill("#c-name", "Imran"); await pg.fill("#c-ph", "98400 12345"); await pg.click('form[data-form="contact"] .btn.primary'); await pg.wait_for_timeout(100)
-    check("first contact defaults to guardian", await pg.is_visible(".pill.ok >> text=Guardian"))
+    await goto_tab(pg, "more")
+    check("settings shows a clear button to add the guardian's WhatsApp number", await pg.is_visible("text=Add guardian's WhatsApp number"))
+    await pg.click('#guardian-card [data-a="edit-contact"]'); await pg.fill("#c-name", "Imran"); await pg.fill("#c-cc", "971"); await pg.fill("#c-ph", "050 123 4567"); await pg.click('form[data-form="contact"] .btn.primary'); await pg.wait_for_timeout(100)
+    card = await pg.inner_text("#guardian-card")
+    check("guardian appears under missed-dose alerts with the full number", "Imran" in card and "+971" in card, card[:200])
+    href = await pg.get_attribute('#guardian-card a[href^="https://wa.me/"]', "href")
+    check("test message goes to the guardian's number with its own country code", href.startswith("https://wa.me/971501234567?text="), href[:60])
     # export/import round trip through the real file input
     st = await pg.evaluate("() => JSON.stringify({app:'dosewell',format:1,state:window.__dosewell.get(),records:[]})")
     path = "/tmp/dw-backup.json"; open(path, "w").write(st)
@@ -148,7 +159,7 @@ async def layout(b):
         await pg.evaluate("([s, r]) => window.__dosewell.load(s, r)", [st, recs]); await pg.wait_for_timeout(150)
         for t in TABS:
             await goto_tab(pg, t); check(f"no sideways scroll at {w}px on {t} with 70-character unbroken text", await no_overflow(pg))
-        await goto_tab(pg, "meds"); await pg.click("#fab"); await pg.wait_for_timeout(100)
+        await goto_tab(pg, "meds"); await pg.locator('[data-a="edit-med"]').first.click(); await pg.click("details summary"); await pg.wait_for_timeout(100)
         ok = await pg.evaluate("() => { const p = document.querySelector('#panel'); return p.scrollWidth <= p.clientWidth + 1 }"); check(f"medicine form fits at {w}px", ok); await pg.keyboard.press("Escape")
         await ctx.close()
     ctx, pg = await new_page(b)
@@ -159,9 +170,9 @@ async def layout(b):
         small += await pg.evaluate("""() => [...document.querySelectorAll('#app button, #app a.btn, #nav a, #fab, #app select, #app input:not([type=checkbox]):not([type=file])')].filter(e => e.offsetParent).map(e => [e.getBoundingClientRect(), (e.dataset.a || e.id || e.tagName)]).filter(([r]) => r.height < 40 || r.width < 40).map(([r, n]) => n + ' ' + Math.round(r.width) + 'x' + Math.round(r.height))""")
     check("every tappable control is at least 40px", not small, sorted(set(small))[:8])
     unl = []
-    for opener in [("meds", "#fab"), ("more", '[data-a="edit-person"]'), ("more", '[data-a="edit-contact"]'), ("records", "#fab")]:
+    for opener in [("meds", '[data-a="edit-med"]'), ("more", '[data-a="edit-person"]'), ("more", '[data-a="edit-contact"]'), ("records", '[data-a="add-rec"]')]:
         await goto_tab(pg, opener[0]); await pg.locator(opener[1]).first.click(); await pg.wait_for_timeout(80)
-        unl += await pg.evaluate("""() => [...document.querySelectorAll('#panel input:not([type=file]), #panel select')].filter(e => !(e.labels && e.labels.length) && !e.getAttribute('aria-label')).map(e => e.id || e.name)""")
+        unl += await pg.evaluate("""() => [...document.querySelectorAll('#panel input:not([type=file]):not([type=hidden]):not([type=radio]):not([type=checkbox]), #panel select')].filter(e => !(e.labels && e.labels.length) && !e.getAttribute('aria-label')).map(e => e.id || e.name)""")
         await pg.keyboard.press("Escape")
     await goto_tab(pg, "more"); unl += await pg.evaluate("""() => [...document.querySelectorAll('#app input:not([type=file]), #app select')].filter(e => !(e.labels && e.labels.length) && !e.getAttribute('aria-label')).map(e => e.id)""")
     check("every form field has a label", not unl, unl)
@@ -211,7 +222,7 @@ window.DosewellNative = {
   takePending(){ const p = window.__store.pending; window.__store.pending = '[]'; return p }, setSnooze(m){ rec('setSnooze', arguments) }, clearDelivered(i){ rec('clearDelivered', arguments) },
   saveState(j){ window.__store.state = j; try { sessionStorage.setItem('nstate', j) } catch (e) {} }, loadState(){ try { return sessionStorage.getItem('nstate') || '' } catch (e) { return '' } },
   recordIds(){ return JSON.stringify(Object.keys(window.__store.recs)) }, readRecord(i){ return window.__store.recs[i] || '' }, writeRecord(i, j){ window.__store.recs[i] = j; return true }, deleteRecord(i){ delete window.__store.recs[i] },
-  copy(t){ rec('copy', arguments) }, shareText(t){ rec('shareText', arguments) }, shareImage(b, t){ rec('shareImage', [b.length, t]) }, shareFile(n, t){ rec('shareFile', [n, t.length]) }, bars(d, c){ rec('bars', arguments) }
+  copy(t){ rec('copy', arguments) }, saveImage(n, m, b){ rec('saveImage', [n, m, b.length]); return 'saved' }, shareB64(n, m, b, t){ rec('shareB64', [n, m, b.length]) }, shareText(t){ rec('shareText', arguments) }, shareImage(b, t){ rec('shareImage', [b.length, t]) }, shareFile(n, t){ rec('shareFile', [n, t.length]) }, bars(d, c){ rec('bars', arguments) }
 };
 """
 async def android_shell(b):
@@ -228,7 +239,7 @@ async def android_shell(b):
     await pg.fill("#p-name", "Amma"); await pg.click('form[data-form="person"] .btn.primary'); await pg.wait_for_timeout(200)
     check("first run asks for notification permission with an explanation", await pg.is_visible("text=Turn on reminders"))
     await pg.click('#panel [data-a="ask-notif"]'); await pg.wait_for_timeout(300)
-    await pg.click("#fab"); await pg.fill("#m-name", "Metformin"); await pg.fill('#times input[type=time]', "23:59"); await pg.click('form[data-form="med"] .btn.primary'); await pg.wait_for_timeout(1600)
+    await pg.click('[data-a="edit-med"]'); await pg.fill("#m-name", "Metformin"); await pg.uncheck('input[name=time][value="08:00"]', force=True); await pg.click('[data-a="add-time"]'); await pg.fill('#times input[type=time]', "23:59"); await pg.click('form[data-form="med"] .btn.primary'); await pg.wait_for_timeout(1600)
     calls = await pg.evaluate("() => window.__calls"); sched = [c for c in calls if c[0] == "schedule"]
     plan = json.loads(sched[-1][1]) if sched else []
     doses = [x for x in plan if x.get("k")]
@@ -282,12 +293,56 @@ async def looks(b):
     check("an unknown look falls back to the default", await pg.evaluate("() => document.documentElement.dataset.skin") == "lilac")
     await ctx.close()
 
+async def viewer_and_size(b):
+    """Record photo viewer: zoom keeps the picture inside the screen, turn works, save and share reach the phone; text size grows the app without breaking layout."""
+    ctx, pg = await new_page(b, width=360, height=760, init=STUB)
+    img = await pg.evaluate("""() => { const c = document.createElement('canvas'); c.width = 1200; c.height = 1600; const x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, 1200, 1600); x.fillStyle = '#000'; x.fillRect(100, 100, 200, 60); return c.toDataURL('image/jpeg', .6) }""")
+    await pg.evaluate("i => window.__dosewell.load({people:[{id:'p1',name:'Amma'}],settings:{onboarded:true}}, [{id:'r1',title:'Dr visit',type:'Prescription',date:'2026-11-10',personId:'p1',img:i}])", img)
+    await goto_tab(pg, "records"); await pg.click(".rec"); await pg.wait_for_timeout(300)
+    edges = "() => { const i = document.querySelector('#vf-img').getBoundingClientRect(), s = document.querySelector('#vf-stage').getBoundingClientRect(); return [i.left - s.left, i.top - s.top, i.right - s.right, i.bottom - s.bottom, i.width, s.width] }"
+    e0 = await pg.evaluate(edges)
+    check("photo opens full-screen and fits inside the frame", e0[0] >= -1 and e0[1] >= -1 and e0[2] <= 1 and e0[3] <= 1, e0)
+    for _ in range(3): await pg.click('[data-a="vz-in"]')
+    await pg.wait_for_timeout(100)
+    box = await pg.locator("#vf-stage").bounding_box()
+    for dx, dy in [(4000, 4000), (-8000, -8000)]:
+        await pg.mouse.move(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2); await pg.mouse.down(); await pg.mouse.move(box["x"] + box["width"] / 2 + dx, box["y"] + box["height"] / 2 + dy, steps=6); await pg.mouse.up(); await pg.wait_for_timeout(60)
+        e = await pg.evaluate(edges)
+        check(f"zoomed photo never leaves a gap when dragged {'right' if dx > 0 else 'left'}", e[0] <= 1 and e[1] <= 1 and e[2] >= -1 and e[3] >= -1 and e[4] > e[5] * 2, [round(x) for x in e])
+    await pg.wait_for_timeout(400)
+    await pg.dblclick("#vf-stage"); await pg.wait_for_timeout(80); e = await pg.evaluate(edges)
+    check("double-tap when zoomed returns to the whole page", e[4] <= e[5] + 1, [round(x) for x in e])
+    await pg.click('[data-a="vz-turn"]'); await pg.wait_for_timeout(100); e = await pg.evaluate(edges)
+    check("turned photo still fits inside the frame", e[0] >= -1 and e[1] >= -1 and e[2] <= 1 and e[3] <= 1, [round(x) for x in e])
+    await pg.click('[data-a="vz-save"]'); await pg.click('[data-a="vz-share"]'); await pg.wait_for_timeout(100)
+    calls = await pg.evaluate("() => window.__calls.map(c => c.slice(0, 3))")
+    sv = [c for c in calls if c[0] == "saveImage"]
+    check("Save sends the photo to the phone's Downloads with a clear file name", sv and sv[0][1] == "dosewell-dr-visit-2026-11-10.jpg" and sv[0][2] == "image/jpeg", sv)
+    check("Share hands the photo to the phone's share menu", any(c[0] == "shareB64" for c in calls))
+    check("viewer has large controls", all(bb["height"] >= 56 for bb in [await pg.locator(x).bounding_box() for x in ('.vf-bar button >> nth=0', '.vf-close')]))
+    await pg.keyboard.press("Escape"); check("Escape or back closes the viewer", not await pg.is_visible(".vf"))
+    await ctx.close()
+    st, recs = hostile_state()
+    for sk in ["lilac", "clear"]:
+        ctx, pg = await new_page(b, width=320, height=740)
+        s2 = json.loads(json.dumps(st)); s2["settings"].update({"skin": sk, "textSize": 1.3})
+        await pg.evaluate("([s, r]) => window.__dosewell.load(s, r)", [s2, recs]); await pg.wait_for_timeout(100)
+        z = await pg.evaluate("() => getComputedStyle(document.body).zoom")
+        bad = []
+        for t in TABS:
+            await goto_tab(pg, t)
+            if not await no_overflow(pg): bad.append(t)
+        await goto_tab(pg, "meds"); await pg.locator('[data-a="edit-med"]').first.click(); await pg.click("details summary"); await pg.wait_for_timeout(80)
+        if not await pg.evaluate("() => { const p = document.querySelector('#panel'); return p.scrollWidth <= p.clientWidth + 1 }"): bad.append("medicine form")
+        check(f"largest text in {sk}: app is bigger and still fits a 320px phone", float(z) >= 1.29 and not bad, (z, bad))
+        await ctx.close()
+
 async def main():
     srv = subprocess.Popen([sys.executable, "-m", "http.server", "8766", "--directory", os.path.join(ROOT, "www")], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL); time.sleep(1)
     try:
         async with async_playwright() as p:
             b = await p.chromium.launch(executable_path=CHROME, args=["--no-sandbox"])
-            for part in (flow, guardian, injection, layout, looks, resilience, android_shell, monkey):
+            for part in (flow, guardian, injection, layout, looks, viewer_and_size, resilience, android_shell, monkey):
                 try: await part(b)
                 except Exception as e: check(part.__name__ + " ran to the end", False, repr(e)[:300])
             await b.close()

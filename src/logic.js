@@ -44,7 +44,7 @@ const arr = v => Array.isArray(v) ? v : [];
 export function blank() {
   return {
     v: 1, people: [], meds: [], logs: {}, contacts: [],
-    settings: { sound: true, threshold: 3, snooze: 10, cc: '91', ack: {}, followUp: true, discreet: false, theme: 'system', skin: 'lilac', onboarded: false },
+    settings: { sound: true, threshold: 3, snooze: 10, cc: '91', ack: {}, followUp: true, discreet: false, theme: 'system', skin: 'lilac', textSize: 1, onboarded: false },
     updatedAt: 0
   };
 }
@@ -101,7 +101,7 @@ export function sanitizeState(raw) {
     const q = obj(c);
     if (!isId(q.id) || cids.has(q.id) || !str(q.name, 40)) continue;
     cids.add(q.id);
-    s.contacts.push({ id: q.id, name: str(q.name, 40), relation: str(q.relation, 30), phone: str(q.phone, 24).replace(/[^\d+\-() ]/g, ''), guardian: q.guardian === true });
+    s.contacts.push({ id: q.id, name: str(q.name, 40), relation: str(q.relation, 30), phone: str(q.phone, 24).replace(/[^\d+\-() ]/g, ''), cc: str(String(q.cc ?? ''), 8).replace(/\D/g, '').slice(0, 4), guardian: q.guardian === true });
   }
   const st = obj(r.settings);
   s.settings.sound = st.sound !== false;
@@ -112,6 +112,7 @@ export function sanitizeState(raw) {
   s.settings.discreet = st.discreet === true;
   s.settings.theme = oneOf(st.theme, ['system', 'light', 'dark'], 'system');
   s.settings.skin = oneOf(st.skin, THEME_IDS, 'lilac');
+  s.settings.textSize = oneOf(Number(st.textSize), [1, 1.15, 1.3], 1);
   s.settings.onboarded = st.onboarded === true;
   const ack = obj(st.ack);
   for (const k of Object.keys(ack)) if (seen.has(k) && typeof ack[k] === 'string') s.settings.ack[k] = str(ack[k], 80);

@@ -122,6 +122,16 @@ export const reminders = {
 export const sharing = {
   canShareFiles: native,
   image(dataUrl, text) { N.shareImage(dataUrl.split(',')[1], text); },
+  // Save a photo: Android puts it in Downloads/Dosewell (or opens the share menu on Android 9 and older); a browser downloads it.
+  async saveImage(name, mime, b64) {
+    if (native) return N.saveImage(name, mime, b64) || '';
+    const bin = atob(b64), u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
+    const blob = new Blob([u], { type: mime });
+    if (store.downloads) { await store.downloads.save({ filename: name, data: blob }); return 'saved'; }
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove();
+    return 'saved';
+  },
+  shareImage(name, mime, b64, text) { if (!native) return false; N.shareB64(name, mime, b64, text); return true; },
   async file(name, text) {
     if (native) { N.shareFile(name, text); return true; }
     if (store.downloads) { await store.downloads.save({ filename: name, data: text }); return true; }

@@ -42,12 +42,12 @@ export const THEMES = [
   },
   {
     id: 'clear', name: 'Clear', tagline: 'Large, bold and easy to read',
-    font: 'Atkinson', display: 'Atkinson', radius: 10, zoom: 1.12, motion: 'none',
+    font: 'Atkinson', display: 'Atkinson', radius: 10, zoom: 1.06, motion: 'none',
     light: T({ bg: '#FFFFFF', surface: '#FFFFFF', ink: '#000000', muted: '#3D3D3D', line: '#8A8A8A', primary: '#0040C1', 'on-primary': '#FFFFFF', 'primary-soft': '#E3EBFF', mint: '#DDF5E3', 'mint-ink': '#0B5A26', peach: '#FFE6CC', 'peach-ink': '#7A3300', rose: '#FFE0E3', 'rose-ink': '#8F0F26', sky: '#E3EBFF', 'sky-ink': '#0B3A9E', butter: '#FFF0B8', 'butter-ink': '#5C4200', good: '#2E9E55', some: '#D9A400', bad: '#D0344E' }),
     dark: T({ bg: '#000000', surface: '#111111', ink: '#FFFFFF', muted: '#CFCFCF', line: '#7A7A7A', primary: '#8FB4FF', 'on-primary': '#000000', 'primary-soft': '#14234A', mint: '#0E2C17', 'mint-ink': '#8EF0AE', peach: '#331C06', 'peach-ink': '#FFC28A', rose: '#3A0A14', 'rose-ink': '#FFA3B4', sky: '#14234A', 'sky-ink': '#B8CEFF', butter: '#2E2400', 'butter-ink': '#FFDF6B', good: '#2E9E55', some: '#C99800', bad: '#D0344E' }),
     art: 'none',
     sound: { alarm: { wave: 'square', gain: .16, notes: [[988, 0, .2], [988, .3, .2], [988, .6, .2], [1319, 1.0, .35]] }, taken: { wave: 'square', gain: .12, notes: [[1319, 0, .12]] } },
-    extra: '.card,.dose,.rec,.cell,.chip,.icon-btn{box-shadow:none;border:2px solid var(--line)}.chip[aria-pressed="true"]{border-color:var(--primary)}h1{font-size:30px;letter-spacing:0}h2,h3,b,strong{letter-spacing:0}body{font-weight:400}.dose-txt b{font-size:19px}.muted,.small{font-weight:700}.tick{border-width:3px}'
+    extra: '.card,.dose,.rec,.cell,.chip,.icon-btn{box-shadow:none;border:2px solid var(--line)}.chip[aria-pressed="true"]{border-color:var(--primary)}h1{font-size:30px;letter-spacing:0}h2,h3,b,strong{letter-spacing:0}body{font-weight:400}.dose-txt b{font-size:19px}.muted,.small{font-weight:700}.tick.take{box-shadow:0 0 0 2px var(--ink)}'
   }
 ];
 
@@ -62,7 +62,7 @@ const FONT_STACK = {
 };
 
 const tokens = o => Object.entries(o).map(([k, v]) => `--${k}:${v};`).join('');
-const shadowLight = '--shadow:0 1px 2px rgba(20,20,40,.05),0 6px 18px rgba(20,20,40,.06);';
+const shadowLight = '--shadow:0 1px 2px rgba(20,20,40,.06),0 2px 8px rgba(20,20,40,.04);';
 const shadowDark = '--shadow:0 1px 2px rgba(0,0,0,.3),0 6px 18px rgba(0,0,0,.25);';
 
 // Animations, chosen by each look's motion style. Every one starts from a visible state.

@@ -1,6 +1,6 @@
 # Test and security report
 
-Dosewell 1.1.0, 15 November 2026. Tested as built from this repository.
+Dosewell 1.2.0, 15 November 2026. Tested as built from this repository.
 
 ## What was run
 
@@ -9,7 +9,7 @@ Dosewell 1.1.0, 15 November 2026. Tested as built from this repository.
 | Logic unit tests (`tests/logic.test.mjs`) | 18 of 18 passed |
 | Fuzz: 400 randomly generated, partly corrupt data sets | Passed, no exceptions, all invariants held |
 | Colour contrast for all five looks, light and dark (`tests/contrast.test.mjs`) | 16 text/background pairs in each of 10 palettes, all at least 4.5:1 |
-| Browser tests in headless Chrome (`tests/e2e.py`) | 94 of 94 passed |
+| Browser tests in headless Chrome (`tests/e2e.py`) | 110 of 110 passed |
 | Dependency audit (`npm audit`) | 0 known vulnerabilities |
 
 ## What was NOT tested
@@ -38,6 +38,11 @@ Dosewell 1.1.0, 15 November 2026. Tested as built from this repository.
 | 14 | No disclaimer, privacy policy or maker details | First-run disclaimer that must be accepted; both documents in the app; About section |
 | 15 | Two looks failed contrast for button text on pale fills | Darkened their accent colours |
 | 16 | The Ocean look's slide-in motion briefly made the page scroll sideways | Page now clips horizontal overflow |
+| 17 | Zooming a record photo shifted it off-centre and left blank gaps | New full-screen viewer: pinch, double-tap, drag with edges held in place, turn |
+| 18 | No way to download a record photo | Save to Downloads/Dosewell (Android 10+; share menu on older phones) and Share |
+| 19 | The guardian's WhatsApp number was hard to find; the country code sat alone in settings | Missed-dose alerts card with the guardian's number, its own country code and a test message |
+| 20 | Two quick drags in the viewer were read as a double-tap and reset the zoom | Double-tap now needs two short, still taps close together |
+| 21 | The add button floated over the Take button on the last dose | Floating button removed; plain Add buttons on each screen |
 
 ## Security posture
 
@@ -60,7 +65,10 @@ Dosewell 1.1.0, 15 November 2026. Tested as built from this repository.
 - first run shows onboarding, navigation hidden
 - cannot continue without accepting the disclaimer
 - onboarding ends on Today with an add-medicine prompt
+- new medicine starts with Morning ticked and After food chosen
+- saving with no time chosen is refused
 - a medicine added today lists only doses still ahead (no instant misses)
+- the Take button is large and labelled
 - one tap marks a dose taken
 - stock decreases when taken
 - data survives a restart
@@ -68,7 +76,9 @@ Dosewell 1.1.0, 15 November 2026. Tested as built from this repository.
 - blank medicine name is rejected
 - end date before start date is rejected
 - Escape closes a sheet
-- first contact defaults to guardian
+- settings shows a clear button to add the guardian's WhatsApp number
+- guardian appears under missed-dose alerts with the full number
+- test message goes to the guardian's number with its own country code
 - erase everything returns to first run
 - erased data stays erased after restart
 - backup restores people, medicines and contacts
@@ -128,6 +138,17 @@ Dosewell 1.1.0, 15 November 2026. Tested as built from this repository.
 - look can be picked on the welcome screen
 - chosen look survives a restart
 - an unknown look falls back to the default
+- photo opens full-screen and fits inside the frame
+- zoomed photo never leaves a gap when dragged right
+- zoomed photo never leaves a gap when dragged left
+- double-tap when zoomed returns to the whole page
+- turned photo still fits inside the frame
+- Save sends the photo to the phone's Downloads with a clear file name
+- Share hands the photo to the phone's share menu
+- viewer has large controls
+- Escape or back closes the viewer
+- largest text in lilac: app is bigger and still fits a 320px phone
+- largest text in clear: app is bigger and still fits a 320px phone
 - app still works when the phone refuses storage
 - corrupted saved data cannot crash start-up: not json
 - corrupted saved data cannot crash start-up: {"people":"x","meds":7}
@@ -147,7 +168,7 @@ Dosewell 1.1.0, 15 November 2026. Tested as built from this repository.
 - share picture, copy and backup go through the phone bridge
 - app restores from the phone's storage after a restart
 - no security-policy violations while running as the Android app
-- 681 random taps and junk entries cause no script errors
+- 671 random taps and junk entries cause no script errors
 - random tapping leaves no injected markup
 - saved data is still valid after random tapping
 - no uncaught script errors in any test

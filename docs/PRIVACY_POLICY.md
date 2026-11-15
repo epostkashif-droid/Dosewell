@@ -1,6 +1,6 @@
 # Dosewell privacy policy
 
-Effective date: 14 November 2026
+Effective date: 15 November 2026
 
 Dosewell is a medicine reminder app made by Kashif Nowman Kanak, Chennai, India ("I", "me").
 
@@ -20,7 +20,7 @@ This includes health information. All of it is stored only in the app's private 
 
 ## Sharing
 
-Dosewell shares nothing by itself. When you tap Share, Tell a guardian, or Back up to a file, the app hands the text, picture or file to the app you choose (for example WhatsApp or Messages). What happens next is covered by that app's own policy. A backup file is not encrypted; keep it somewhere safe.
+Dosewell shares nothing by itself. When you tap Save on a record photo, it is saved to your phone's Downloads folder, where other apps on your phone can see it. When you tap Share, Tell a guardian, or Back up to a file, the app hands the text, picture or file to the app you choose (for example WhatsApp or Messages). What happens next is covered by that app's own policy. A backup file is not encrypted; keep it somewhere safe.
 
 ## Permissions
 
